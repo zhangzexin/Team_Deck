@@ -1,5 +1,6 @@
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.MaterialTheme
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -8,6 +9,9 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.zzx.desktop.teamdeck.ui.App1
 import com.zzx.desktop.teamdeck.ui.DropBoxPanel
+import com.zzx.desktop.teamdeck.utils.NsdManagerUtils
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.awt.event.ContainerEvent
 import java.awt.event.ContainerListener
 
@@ -33,8 +37,13 @@ fun main() = application {
         MaterialTheme {
             App1()
         }
-//        DropBoxPanel(modifier = Modifier.size(300.dp), window = window) {
-//            println(it)
-//        }
+
+        val rememberCoroutineScope = rememberCoroutineScope()
+        DropBoxPanel(modifier = Modifier.size(300.dp), window = window) {
+            rememberCoroutineScope.launch(Dispatchers.IO) {
+                NsdManagerUtils.Instance.sendFile(it)
+            }
+            println(it)
+        }
     }
 }

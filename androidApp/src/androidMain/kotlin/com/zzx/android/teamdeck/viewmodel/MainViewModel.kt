@@ -1,6 +1,7 @@
 package com.zzx.android.teamdeck.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.zzx.android.teamdeck.drawer.DrawerState
 import com.zzx.android.teamdeck.drawer.DrawerValue
 import com.zzx.android.teamdeck.socket.WebSocketHandler
@@ -16,7 +17,7 @@ import kotlinx.coroutines.launch
 class MainViewModel: ViewModel() {
 
     val webSocketHandler by lazy {
-        WebSocketHandler()
+        WebSocketHandler(viewModelScope)
     }
     private var _drawerValue = MutableStateFlow(DrawerState(DrawerValue.Closed))
     val drawerValue = _drawerValue

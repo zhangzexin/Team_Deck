@@ -5,6 +5,7 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdManager.DiscoveryListener
 import android.net.nsd.NsdServiceInfo
 import android.util.Log
+import androidx.annotation.RequiresApi
 
 
 class NsdManagerTool internal constructor(
@@ -14,6 +15,28 @@ class NsdManagerTool internal constructor(
     var onInfoCallBack: InfoCallBack? = null
     var desList: MutableList<NsdServiceInfo> = ArrayList()
     var tempServiceList: MutableList<NsdServiceInfo> = ArrayList()
+
+    val mResolveListener: NsdManager.ResolveListener = object : NsdManager.ResolveListener {
+        override fun onResolveFailed(nsdServiceInfo: NsdServiceInfo, i: Int) {
+            Log.d("xm--------", "onResolveFailed")
+        }
+
+        override fun onServiceResolved(nsdServiceInfo: NsdServiceInfo) {
+            Log.d("xm--------", "onServiceResolved")
+            var didHad = false
+            for (i in desList.indices) {
+                val info = desList[i]
+                if (info.serviceName == nsdServiceInfo.serviceName) {
+                    didHad = true
+                    break
+                }
+            }
+            if (!didHad) {
+                desList.add(nsdServiceInfo)
+            }
+            onInfoCallBack?.msgCallback(desList)
+        }
+    }
 
     init {
         if (nsdManager == null) {
@@ -72,27 +95,7 @@ class NsdManagerTool internal constructor(
                         tempServiceList.add(nsdServiceInfo)
                     }
                     for (info in tempServiceList) {
-                        nsdManager!!.resolveService(info, object : NsdManager.ResolveListener {
-                            override fun onResolveFailed(nsdServiceInfo: NsdServiceInfo, i: Int) {
-                                Log.d("xm--------", "onResolveFailed")
-                            }
-
-                            override fun onServiceResolved(nsdServiceInfo: NsdServiceInfo) {
-                                Log.d("xm--------", "onServiceResolved")
-                                var didHad = false
-                                for (i in desList.indices) {
-                                    val info = desList[i]
-                                    if (info.serviceName == nsdServiceInfo.serviceName) {
-                                        didHad = true
-                                        break
-                                    }
-                                }
-                                if (!didHad) {
-                                    desList.add(nsdServiceInfo)
-                                }
-                                onInfoCallBack?.msgCallback(desList)
-                            }
-                        })
+                        nsdManager!!.resolveService(info, mResolveListener)
                         try {
                             Thread.sleep(10)
                         } catch (e: InterruptedException) {

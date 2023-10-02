@@ -51,7 +51,6 @@ import com.zzx.android.teamdeck.NsdManagerTool
 import com.zzx.android.teamdeck.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 
 /**
@@ -105,7 +104,11 @@ fun AppDrawer(viewModel: MainViewModel) {
         }
     }
 
-    SearchDialog(viewModel) { mConnectionInfo }
+    SearchDialog(viewModel, {
+        nsdManagerTool.stop()
+    }) {
+        mConnectionInfo
+    }
 
     ModalDrawerSheet(
         Modifier
@@ -117,7 +120,7 @@ fun AppDrawer(viewModel: MainViewModel) {
         Spacer(Modifier.height(12.dp))
 
         Box {
-            SearchList({searchList}) { it -> mConnectionInfo.value = it }
+            SearchList({ searchList }) { it -> mConnectionInfo.value = it }
             if (searchList.size <= 0 && isSearch.value) {
                 CircularProgressIndicator(
                     modifier = Modifier
@@ -179,8 +182,13 @@ fun AppDrawer(viewModel: MainViewModel) {
 //        }
 //    }
 }
+
 @Composable
-fun SearchDialog(viewModel: MainViewModel, connectionInfo: () -> MutableState<NsdServiceInfo?>) {
+fun SearchDialog(
+    viewModel: MainViewModel,
+    closeNsd: () -> Unit,
+    connectionInfo: () -> MutableState<NsdServiceInfo?>
+) {
     val connectionInfo = connectionInfo().value
     val scope = rememberCoroutineScope()
     when {
@@ -192,7 +200,11 @@ fun SearchDialog(viewModel: MainViewModel, connectionInfo: () -> MutableState<Ns
                 onConfirmation = {
                     connectionInfo().value = null
                     viewModel.closeDrawer(scope)
-                    viewModel.connectionWebSocket(connectionInfo.host.hostAddress, connectionInfo.port)
+                    viewModel.connectionWebSocket(
+                        connectionInfo.host.hostAddress,
+                        connectionInfo.port
+                    )
+                    closeNsd()
                 },
                 dialogTitle = "连接设备",
                 dialogText = "确定与\"${connectionInfo.serviceName}\"设备进行匹配！",
@@ -203,13 +215,13 @@ fun SearchDialog(viewModel: MainViewModel, connectionInfo: () -> MutableState<Ns
 }
 
 @Composable
-fun SearchButton(nsdManagerTool: NsdManagerTool, isSearch:() -> MutableState<Boolean>) {
+fun SearchButton(nsdManagerTool: NsdManagerTool, isSearch: () -> MutableState<Boolean>) {
 
     val scope = rememberCoroutineScope()
     val inversePrimary = MaterialTheme.colorScheme.inversePrimary
     val currentColor = LocalContentColor.current
-    val getColor:() -> Color = {if (!isSearch().value) inversePrimary  else currentColor}
-    val getString:() -> String = {if (!isSearch().value) "开始搜索设备" else "停止搜索设备"}
+    val getColor: () -> Color = { if (!isSearch().value) inversePrimary else currentColor }
+    val getString: () -> String = { if (!isSearch().value) "开始搜索设备" else "停止搜索设备" }
 
     NavigationDrawerItem(
         icon = {
@@ -222,16 +234,12 @@ fun SearchButton(nsdManagerTool: NsdManagerTool, isSearch:() -> MutableState<Boo
         label = { Text(getString()) },
         selected = isSearch().value,
         onClick = {
-            scope.launch {
+            scope.launch(Dispatchers.IO) {
 //                                drawerState.close()
                 if (isSearch().value) {
-                    withContext(Dispatchers.IO) {
-                        nsdManagerTool.start()
-                    }
+                    nsdManagerTool.start()
                 } else {
-                    withContext(Dispatchers.IO) {
-                        nsdManagerTool.stop()
-                    }
+                    nsdManagerTool.stop()
                 }
             }
             isSearch().value = !isSearch().value
@@ -245,7 +253,10 @@ fun SearchButton(nsdManagerTool: NsdManagerTool, isSearch:() -> MutableState<Boo
 }
 
 @Composable
-fun SearchList(list:()-> MutableMap<String, NsdServiceInfo>, openDialog: (NsdServiceInfo) -> Unit) {
+fun SearchList(
+    list: () -> MutableMap<String, NsdServiceInfo>,
+    openDialog: (NsdServiceInfo) -> Unit
+) {
     Toast.makeText(LocalContext.current, "size:${list().size}", Toast.LENGTH_LONG).show()
     LazyColumn(
         modifier = Modifier
@@ -268,7 +279,7 @@ fun SearchList(list:()-> MutableMap<String, NsdServiceInfo>, openDialog: (NsdSer
                     }
                     .padding(vertical = 3.dp),
                 contentAlignment = Alignment.Center,
-                ) {
+            ) {
                 Text(text = it.second.serviceName)
             }
             if (toList.last() != it) Divider()

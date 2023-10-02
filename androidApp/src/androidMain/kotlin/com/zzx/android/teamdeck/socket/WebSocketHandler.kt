@@ -3,6 +3,10 @@ package com.zzx.android.teamdeck.socket
 import android.util.Log
 import com.zzx.android.teamdeck.socket.MessageHandler
 import com.zzx.android.teamdeck.socket.ssl.RxUtils
+import com.zzx.common.socket.InputFileHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -13,12 +17,12 @@ import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLSocketFactory
 
 
-class WebSocketHandler {
+class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
 
     private val TAG: String = "MainActivity"
     private var webClient: OkHttpClient? = null
     private var webSocket: WebSocket? = null
-
+    private val mInputFileHandler = InputFileHandler()
 
     private val socketlistener = object : WebSocketListener() {
         /**
@@ -39,13 +43,16 @@ class WebSocketHandler {
         /** Invoked when a binary (type `0x2`) message has been received. */
         override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
             Log.d(TAG, "onMessage(type `0x2`): ")
+            coroutineScope?.launch(Dispatchers.IO) {
+                mInputFileHandler.dispacthFile(webSocket,bytes)
+            }
         }
 
         /**
          * Invoked when the remote peer has indicated that no more incoming messages will be transmitted.
          */
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-            Log.d(TAG, "onClosing: ")
+            Log.d(TAG, "onClosing: code:$code reason:$reason")
         }
 
         /**
@@ -53,7 +60,7 @@ class WebSocketHandler {
          * connection has been successfully released. No further calls to this listener will be made.
          */
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-            Log.d(TAG, "onClosed: ")
+            Log.d(TAG, "onClosed: code:$code reason:$reason")
         }
 
         /**
@@ -62,7 +69,7 @@ class WebSocketHandler {
          * listener will be made.
          */
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-            Log.d(TAG, "onFailure: ")
+            Log.d(TAG, "onFailure: response:${response.toString()}\n Throwable:${t.toString()}")
         }
     }
 

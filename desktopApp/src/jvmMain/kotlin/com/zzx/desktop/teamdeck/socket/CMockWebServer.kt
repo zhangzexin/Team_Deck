@@ -655,6 +655,7 @@ class CMockWebServer : ExternalResource(), Closeable {
             socket.startHandshake() // we're testing a handshake failure
             throw AssertionError()
         } catch (expected: IOException) {
+            logger.log(Level.SEVERE, expected.toString())
         }
         socket.close()
     }

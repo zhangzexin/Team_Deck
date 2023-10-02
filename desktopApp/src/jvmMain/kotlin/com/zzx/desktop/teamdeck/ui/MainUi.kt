@@ -43,25 +43,20 @@ fun App1() {
         }
     }
     LaunchedEffect(true) {
-        rememberCoroutineScope.launch {
-            withContext(Dispatchers.IO) {
-                var port = 0
-                NsdManagerUtils.Instance.mockWebSocket(this).let {
-                    port = it.port
-                    println("port:$port")
-                }
-                if (port > 0) {
-                    MdnsUtils.instance.setUp(port)
-                }
-                while (true) {
-                    delay(1000)
-                    index += 1
-                }
+        rememberCoroutineScope.launch(Dispatchers.IO) {
+            var port = 0
+            NsdManagerUtils.Instance.mockWebSocket(rememberCoroutineScope).let {
+                port = it.port
+                println("port:$port")
+            }
+            if (port > 0) {
+                MdnsUtils.instance.setUp(port)
             }
         }
     }
     DisposableEffect(Unit) {
         onDispose {
+            NsdManagerUtils.Instance.stopMock()
             MdnsUtils.instance.stop()
             FlowBus.with<Message<InitUiEvent>>(CodeEnum.INITUI.name).unRegister()
         }

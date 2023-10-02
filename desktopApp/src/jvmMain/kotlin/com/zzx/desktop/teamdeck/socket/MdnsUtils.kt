@@ -51,7 +51,7 @@ class MdnsUtils {
 
             override fun serviceResolved(event: ServiceEvent?) {
                 // 在这里是检索到了服务，但是为啥是这个命名。然后再这里就获取信息就自己处理逻辑，比较服务很多。
-                println("serviceResolved:"+event?.info)
+//                println("serviceResolved:"+event?.info)
             }
 
         })

@@ -15,8 +15,8 @@ object GsonExt {
 }
 
 
-fun Any.toJson(includeNulls: Boolean = true): String{
-    return GsonExt.gson.toJson(includeNulls)
+fun Any.toJson(): String{
+    return GsonExt.gson.toJson(this)
 }
 
 inline fun <reified T> String.fromJson():T {

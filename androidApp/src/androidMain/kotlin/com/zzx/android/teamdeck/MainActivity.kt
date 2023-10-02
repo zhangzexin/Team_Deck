@@ -8,6 +8,7 @@ import androidx.compose.ui.unit.dp
 import com.zzx.android.teamdeck.ui.components.TeamDeckApp
 import com.zzx.android.teamdeck.ui.theme.AppTheme
 import com.zzx.android.teamdeck.viewmodel.MainViewModel
+import com.zzx.common.socket.InputFileHandler.Companion.plugindir
 
 
 val baseMaxWidth = 360.dp
@@ -17,6 +18,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        plugindir = this.getFileStreamPath("plugin").path
         setContent {
             AppTheme {
                 val viewModel: MainViewModel by viewModels()

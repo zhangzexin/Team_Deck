@@ -1,24 +1,32 @@
 package com.zzx.desktop.teamdeck.utils
 
 import com.google.gson.Gson
+import com.zzx.common.socket.OutFileHandler
 import com.zzx.common.socket.model.InitEvent
 import com.zzx.common.socket.model.Message
 import com.zzx.common.socket.type.CodeEnum
+import com.zzx.desktop.teamdeck.socket.CMockWebServer
+import com.zzx.desktop.teamdeck.socket.MdnsUtils
+import com.zzx.desktop.teamdeck.socket.MessageHandler
+import com.zzx.desktop.teamdeck.socket.ssl.RxUtils
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okhttp3.mockwebserver.MockResponse
 import okio.ByteString
-import com.zzx.desktop.teamdeck.socket.CMockWebServer
-import com.zzx.desktop.teamdeck.socket.ssl.RxUtils
-import com.zzx.desktop.teamdeck.socket.MessageHandler
 import java.net.InetAddress
 import javax.net.ssl.SSLSocketFactory
 
 class NsdManagerUtils {
     var mMockWebSocket: CMockWebServer? = null
     var coroutineScope: CoroutineScope? = null
+    val mOutFileHandler = OutFileHandler()
+    var mWebSocket: WebSocket? = null
+
 
     companion object {
         val Instance by lazy {
@@ -29,11 +37,13 @@ class NsdManagerUtils {
     val webSocketListener = object : WebSocketListener() {
         val gson = Gson()
         override fun onOpen(webSocket: WebSocket, response: Response) {
+            mWebSocket = webSocket
             // 当 websocket 连接打开时，发送一条欢迎消息
             val initEvent = InitEvent(emptyList())
             val message = Message<InitEvent>(code = CodeEnum.INIT.value, msg = "连接成功", initEvent)
             val json = gson.toJson(message)
-            webSocket.send(json)
+            mWebSocket?.send(json)
+            MdnsUtils.instance.stop()
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
@@ -44,7 +54,9 @@ class NsdManagerUtils {
         }
 
         override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-
+            coroutineScope?.launch(Dispatchers.IO) {
+                mOutFileHandler.dispacthFile(webSocket, bytes)
+            }
         }
 
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
@@ -101,7 +113,12 @@ class NsdManagerUtils {
         return mMockWebSocket!!
     }
 
+    suspend fun sendFile(path: String) {
+        mWebSocket?.let { mOutFileHandler.sendFile(path, it) }
+    }
+
     fun stopMock() {
+        coroutineScope?.cancel()
         coroutineScope = null
         mMockWebSocket?.close()
         mMockWebSocket = null

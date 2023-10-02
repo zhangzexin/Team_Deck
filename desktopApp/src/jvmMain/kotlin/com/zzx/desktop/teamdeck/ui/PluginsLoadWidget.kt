@@ -15,6 +15,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import com.zzx.desktop.teamdeck.utils.NsdManagerUtils
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 
@@ -23,6 +26,7 @@ import org.jetbrains.compose.resources.painterResource
 fun PluginsLoadWidget() {
     val stroke = Stroke(width = 2f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f))
     var isDragging by remember { mutableStateOf(false) }
+    val rememberCoroutineScope = rememberCoroutineScope()
     Box(
         modifier = Modifier.fillMaxSize(0.5f)
             .background(if (!isDragging) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.inverseOnSurface, shape = RoundedCornerShape(10f))
@@ -52,7 +56,9 @@ fun PluginsLoadWidget() {
 //                    println(dragData.readImage().toString())
                 } else if (dragData is DragData.FilesList) {
                     dragData.readFiles().first().let {
-                        println(it)
+                        rememberCoroutineScope.launch(Dispatchers.IO) {
+//                            NsdManagerUtils.Instance.sendFile(it)
+                        }
                     }
                 }
                 isDragging = false
