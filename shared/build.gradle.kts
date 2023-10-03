@@ -31,6 +31,7 @@ kotlin {
                 api(compose.components.resources)
                 api(compose.ui)
                 api(compose.preview)
+                api(compose.runtimeSaveable)
                 api(libs.okhttp)
                 api(libs.google.gson)
 
@@ -55,6 +56,7 @@ kotlin {
         val desktopMain by getting {
             dependencies {
                 api(compose.desktop.common)
+                api(compose.desktop.windows_x64)
                 api(libs.okhttp3.mockwebserver)
                 api(libs.jmdns)
             }
