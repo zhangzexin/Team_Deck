@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.desktopplugin"
+    namespace = "com.example.imageplugin"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.zzx.plugin.sample"
+        applicationId = "com.zzx.plugin.image"
         minSdk = 24
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -18,6 +18,10 @@ android {
 
     buildTypes {
         release {
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        debug {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
@@ -38,7 +42,7 @@ android {
 }
 
 tasks.register<Zip>("packageUniversalApk") {
-    archiveFileName.set("universal-plugin.apk")
+    archiveFileName.set("universal-image-plugin.apk")
     destinationDirectory.set(layout.buildDirectory.dir("libs"))
 
     // 1. 包含编译后的 .class 文件 (用于 Desktop JVM 加载)
@@ -47,8 +51,7 @@ tasks.register<Zip>("packageUniversalApk") {
     
     // 2. 包含 Android APK 的全部内容 (DEX, 资源, 清单文件)
     dependsOn("assembleDebug")
-    from(zipTree(layout.buildDirectory.file("outputs/apk/debug/desktopplugin-debug.apk"))) {
-        // 排除原 APK 的签名信息，防止安装包损坏提示
+    from(zipTree(layout.buildDirectory.file("outputs/apk/debug/imageplugin-debug.apk"))) {
         exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
     }
     
@@ -61,7 +64,6 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     
-    // Compose dependencies for plugin UI
     implementation(compose.runtime)
     implementation(compose.foundation)
     implementation(compose.material3)

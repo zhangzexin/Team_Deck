@@ -12,14 +12,17 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import okhttp3.Dns
+import okhttp3.Protocol
 import okio.ByteString
+import java.net.Inet4Address
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLSocketFactory
 
 
 class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
 
-    private val TAG: String = "MainActivity"
+    private val TAG: String = "TeamDeck-Net"
     private var webClient: OkHttpClient? = null
     private var webSocket: WebSocket? = null
     private val mInputFileHandler = InputFileHandler()
@@ -30,7 +33,7 @@ class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
          * messages.
          */
         override fun onOpen(webSocket: WebSocket, response: Response) {
-            Log.d(TAG, "onOpen: ")
+            Log.d(TAG, "onOpen: Success! Handshake complete.")
 //            webSocket?.send("你好")
         }
 
@@ -69,7 +72,8 @@ class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
          * listener will be made.
          */
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-            Log.d(TAG, "onFailure: response:${response.toString()}\n Throwable:${t.toString()}")
+            Log.e(TAG, "onFailure: Connection error! Response: $response, Error: $t")
+            t.printStackTrace()
         }
     }
 
@@ -79,15 +83,21 @@ class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
         }
         val factory: SSLSocketFactory? = RxUtils.createSSLSocketFactory()
         webClient = OkHttpClient.Builder()
-//            .sslSocketFactory(factory!!, TrustAllCerts())
-//            .hostnameVerifier(RxUtils.TrustAllHostnameVerifier())
-//            .retryOnConnectionFailure(true)//允许失败重试
+            .dns(object : Dns {
+                override fun lookup(hostname: String): List<java.net.InetAddress> {
+                    // 强制只返回 IPv4 地址，彻底避开 IPv6 超时黑洞
+                    return Dns.SYSTEM.lookup(hostname).filter { it is Inet4Address }
+                }
+            })
+            .protocols(listOf(Protocol.HTTP_1_1)) // 锁定协议，跳过 HTTP/2 协商
+            .retryOnConnectionFailure(true)//允许失败重试
             .pingInterval(30,TimeUnit.SECONDS) //心跳
             .readTimeout(30,TimeUnit.SECONDS)//设置读取超时时间
             .writeTimeout(30,TimeUnit.SECONDS)//设置写入超时时间
-            .connectTimeout(5,TimeUnit.SECONDS)//设置连接超时时间
+            .connectTimeout(3,TimeUnit.SECONDS)//设置连接超时时间
             .build()
         val webSocketUrl = "ws://${hostName}:${port}"
+        Log.d(TAG, "Initiating Connection to: $webSocketUrl")
         val request = Request.Builder().url(webSocketUrl).build()
         webSocket = webClient?.newWebSocket(request, socketlistener)
 

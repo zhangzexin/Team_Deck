@@ -14,7 +14,6 @@ import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 
 object SocketFileHelper {
-    val body = ByteBuffer.allocate(16 * 1024)
     var count = 0
 
     suspend fun pushFile(path: String, webSocket: WebSocket, changeEnd: () -> Unit) {
@@ -45,6 +44,7 @@ object SocketFileHelper {
 
     suspend fun pushFileV2(newByteChannel: SeekableByteChannel, webSocket: WebSocket, changeEnd: () -> Unit) {
         withContext(Dispatchers.IO) {
+            val body = ByteBuffer.allocate(16 * 1024)
             body.put(ByteType.BYTE_FILE_BODY)
             if (newByteChannel.read(body) > 0) {
                 body.flip()
@@ -58,7 +58,6 @@ object SocketFileHelper {
                 newByteChannel.close()
                 changeEnd()
             }
-            body.clear()
         }
     }
 

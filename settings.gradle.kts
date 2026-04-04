@@ -40,3 +40,4 @@ dependencyResolutionManagement {
     }
 }
 include(":desktopplugin")
+include(":imageplugin")

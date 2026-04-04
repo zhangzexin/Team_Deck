@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  *@描述：文件管理类
@@ -20,7 +21,7 @@ object FileUtils {
         createDirs(target)
         val fileTarget = File(target+"/"+fileSource.toPath().fileName)
         withContext(Dispatchers.IO) {
-            Files.copy(fileSource.toPath(), fileTarget.toPath())
+            Files.copy(fileSource.toPath(), fileTarget.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
     }
 

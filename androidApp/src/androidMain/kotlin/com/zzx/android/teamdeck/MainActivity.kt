@@ -8,6 +8,8 @@ import androidx.compose.ui.unit.dp
 import com.zzx.android.teamdeck.ui.components.TeamDeckApp
 import com.zzx.android.teamdeck.ui.theme.AppTheme
 import com.zzx.android.teamdeck.viewmodel.MainViewModel
+import com.zzx.common.plugin.PluginLoader
+import com.zzx.common.socket.InputFileHandler
 import com.zzx.common.socket.InputFileHandler.Companion.plugindir
 
 
@@ -19,6 +21,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         plugindir = this.getFileStreamPath("plugin").path
+        InputFileHandler.pluginLoader = PluginLoader(this)
         setContent {
             AppTheme {
                 val viewModel: MainViewModel by viewModels()

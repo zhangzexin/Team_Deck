@@ -104,7 +104,8 @@ class NsdManagerUtils {
 
         // 将响应添加到队列中
         mMockWebSocket?.enqueue(mockResponse)
-        mMockWebSocket?.start(InetAddress.getByName(InetAddress.getLocalHost().hostAddress), 0)
+        val address = NetUtils.getLocalHostAddress()
+        mMockWebSocket?.start(address, 0)
         // 获取服务器的 URL
         val serverUrl = mMockWebSocket?.url("/")
 

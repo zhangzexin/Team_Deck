@@ -5,12 +5,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Card
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.zzx.common.plugin.PluginManager
 import com.zzx.desktop.teamdeck.md_theme_dark_outlineVariant
 
 @Composable
@@ -27,7 +29,7 @@ fun ButtonLayout() {
             val height = this@BoxWithConstraints.maxHeight - 20.dp
             val fix_h = number / fix_w
 //                    val baseButton = if (fix_h < fix_w) height/fix_w else width/fix_h
-            val baseButton = 180.dp
+            val baseButton = 100.dp
             val h = (height / baseButton).toInt()
             val w = (width / baseButton).toInt()
             val sw = (width - (baseButton * w)) / w
@@ -35,23 +37,13 @@ fun ButtonLayout() {
             ItemBuild(h * w, w, sw, sh, baseButton)
         }
     }
-//    Row {
-//        Button(onClick = {
-//            setText("stop")
-//            println("点击了")
-//        }) {
-//            Text(onText())
-//        }
-//        Button(onClick = {
-//        }) {
-//            Text(onIndex().toString())
-//        }
-//    }
-
 }
 
 @Composable
 private fun ItemBuild(n: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp) {
+    val pluginsState = PluginManager.pluginFlow.collectAsState()
+    val loadedPlugins = pluginsState.value
+
     LazyVerticalGrid(
         columns = GridCells.Fixed(w),
         horizontalArrangement = Arrangement.spacedBy(sw + 1.dp),
@@ -59,15 +51,31 @@ private fun ItemBuild(n: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp) {
         contentPadding = PaddingValues(vertical = sh, horizontal = sw),
         userScrollEnabled = false
     ) {
-        items(n) {
+        // 1. 渲染已加载的插件
+        items(loadedPlugins.size) { index ->
+            val plugin = loadedPlugins[index]
+            Card(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .size(baseButton, baseButton)
+                    .clickable {
+                        plugin.onTrigger("click")
+                    },
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+            ) {
+                plugin.AppUI()
+            }
+        }
+        
+        // 2. 渲染剩余占位符
+        val placeholderCount = (n - loadedPlugins.size).coerceAtLeast(0)
+        items(placeholderCount) {
             Card(
                 modifier = Modifier.clip(RoundedCornerShape(16.dp)).size(baseButton, baseButton)
                     .clickable {
-//                    Toast
-//                        .makeText(context, "点击了$it", Toast.LENGTH_SHORT)
-//                        .show()
-//                        println("点击了")
-                    }, backgroundColor = md_theme_dark_outlineVariant
+                        // 占位符逻辑
+                    },
+                colors = CardDefaults.cardColors(containerColor = md_theme_dark_outlineVariant)
             ) {
 
             }

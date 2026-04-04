@@ -9,14 +9,12 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -98,6 +96,14 @@ fun TeamDeckApp(viewModel: MainViewModel) {
 private fun ItemBuild(number: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp, viewModel: MainViewModel) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    // 监听整个列表的变化
+    val pluginsState = com.zzx.common.plugin.PluginManager.pluginFlow.collectAsState()
+    val loadedPlugins = pluginsState.value
+
+    // 监听正在传输的文件进度
+    val transferState = com.zzx.common.plugin.PluginManager.transferFlow.collectAsState()
+    val ongoingTransfers = transferState.value.toList()
+    
     LaunchedEffect(Unit) {
         FlowBus.with<Message<InitEvent>>(InitMessageType.code.name).register(lifecycleOwner) {
             val json = MessageHandler.gson.toJson(
@@ -117,17 +123,78 @@ private fun ItemBuild(number: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp, viewM
         contentPadding = PaddingValues(vertical = sh, horizontal = sw),
         userScrollEnabled = false
     ) {
-        items(number) {
+        // 1. 渲染加载完成的插件
+        items(loadedPlugins.size) { index ->
+            val plugin = loadedPlugins[index]
+            Card(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .size(baseButton, baseButton)
+                    .clickable {
+                        plugin.onTrigger("click")
+                    },
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+            ) {
+                plugin.AppUI()
+            }
+        }
+
+        // 2. 渲染正在传输的进度格子
+        items(ongoingTransfers.size) { index ->
+            val (fileName, progress) = ongoingTransfers[index]
+            ProgressItem(fileName, progress, baseButton)
+        }
+        
+        // 3. 渲染剩余的占位符 (计算修正)
+        val placeholderCount = (number - loadedPlugins.size - ongoingTransfers.size).coerceAtLeast(0)
+        items(placeholderCount) {
             Card(modifier = Modifier
                 .clip(RoundedCornerShape(16.dp))
                 .size(baseButton, baseButton)
                 .clickable {
                     Toast
-                        .makeText(context, "点击了$it", Toast.LENGTH_SHORT)
+                        .makeText(context, "点击了${it + loadedPlugins.size + ongoingTransfers.size}", Toast.LENGTH_SHORT)
                         .show()
                 }) {
 
             }
+        }
+    }
+}
+
+@Composable
+fun ProgressItem(fileName: String, progress: Float, size: Dp) {
+    Card(
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .size(size, size),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(8.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "正在接收...",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = progress,
+                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${(progress * 100).toInt()}%",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

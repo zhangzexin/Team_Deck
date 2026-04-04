@@ -22,7 +22,7 @@ class NsdManagerTool internal constructor(
         }
 
         override fun onServiceResolved(nsdServiceInfo: NsdServiceInfo) {
-            Log.d("xm--------", "onServiceResolved")
+            Log.d("TeamDeck-Net", "Resolve Success: ${nsdServiceInfo.serviceName} at ${nsdServiceInfo.host}:${nsdServiceInfo.port}")
             var didHad = false
             for (i in desList.indices) {
                 val info = desList[i]
@@ -71,7 +71,7 @@ class NsdManagerTool internal constructor(
                 }
 
                 override fun onDiscoveryStarted(s: String) {
-                    Log.d("xm--------", "onDiscoveryStarted")
+                    Log.d("TeamDeck-Net", "Discovery Started: $s")
                 }
 
                 override fun onDiscoveryStopped(s: String) {
@@ -79,10 +79,7 @@ class NsdManagerTool internal constructor(
                 }
 
                 override fun onServiceFound(nsdServiceInfo: NsdServiceInfo) {
-//                    mmNsdServiceInfo = nsdServiceInfo;
-                    //这里的nsdServiceInfo只能获取到名字,ip和端口都不能获取到,要想获取到需要调用NsdManager.resolveService方法
-                    Log.d("xm--------", "onServiceFound")
-                    Log.d("xm--------", nsdServiceInfo.serviceName)
+                    Log.d("xm--------", "onServiceFound: ${nsdServiceInfo.serviceName}")
                     var didHad = false
                     for (i in tempServiceList.indices) {
                         val currentInfo = tempServiceList[i]
@@ -93,14 +90,9 @@ class NsdManagerTool internal constructor(
                     }
                     if (!didHad) {
                         tempServiceList.add(nsdServiceInfo)
-                    }
-                    for (info in tempServiceList) {
-                        nsdManager!!.resolveService(info, mResolveListener)
-                        try {
-                            Thread.sleep(10)
-                        } catch (e: InterruptedException) {
-                            e.printStackTrace()
-                        }
+                        Log.d("TeamDeck-Net", "New Service Found, resolving: ${nsdServiceInfo.serviceName}")
+                        // 【优化点】只解析最新发现的服务，不再循环遍历全列表解析
+                        nsdManager?.resolveService(nsdServiceInfo, mResolveListener)
                     }
                 }
 

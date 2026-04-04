@@ -10,6 +10,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.zzx.desktop.teamdeck.ApplicationInfo
 import com.zzx.desktop.teamdeck.plugin.PluginManager
+import com.zzx.common.plugin.PluginLoader
 import com.zzx.desktop.teamdeck.ui.App1
 import com.zzx.desktop.teamdeck.ui.DropBoxPanel
 import com.zzx.desktop.teamdeck.utils.FileUtils
@@ -18,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.awt.event.ContainerEvent
 import java.awt.event.ContainerListener
+import java.io.File
 import java.nio.file.Paths
 
 //fun main() = application {
@@ -46,10 +48,35 @@ fun main() = application {
         val rememberCoroutineScope = rememberCoroutineScope()
         DropBoxPanel(modifier = Modifier.size(300.dp), window = window) {
             rememberCoroutineScope.launch(Dispatchers.IO) {
-                if (it.endsWith(".apk")) {
+                if (it.endsWith(".apk") || it.endsWith(".aar") || it.endsWith(".jar")) {
+                    val localCopy = File(ApplicationInfo.LocalAppData.toString(), File(it).name).absolutePath
                     FileUtils.copyFileTo(it, ApplicationInfo.LocalAppData.toString())
+                    
+                    // 异步发送原始文件
                     NsdManagerUtils.Instance.sendFile(it)
-                    println(it)
+
+                    // 加载本地副本以在 Desktop 端展示 UI (避免 Windows 文件锁冲突)
+                    val loader = PluginLoader()
+                    val candidates = listOf("com.zzx.plugin.ImagePlugin", "com.zzx.plugin.SamplePlugin")
+                    var loadedPlugin: com.zzx.common.plugin.IPlugin? = null
+                    
+                    for (className in candidates) {
+                        try {
+                            val p = loader.loadPlugin(localCopy, className)
+                            if (p != null) {
+                                loadedPlugin = p
+                                println("Successfully loaded plugin class from main.kt: $className")
+                                break
+                            }
+                        } catch (e: Exception) {
+                            // 继续尝试
+                        }
+                    }
+
+                    loadedPlugin?.let { p ->
+                        com.zzx.common.plugin.PluginManager.addPlugin(p)
+                    }
+                    println("Desktop plugin handled from: $localCopy")
                 }
             }
         }

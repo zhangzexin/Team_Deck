@@ -20,6 +20,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
+import com.zzx.common.plugin.PluginManager
+import com.zzx.common.plugin.PluginLoader
 
 @OptIn(ExperimentalResourceApi::class, ExperimentalComposeUiApi::class)
 @Composable
@@ -55,9 +57,51 @@ fun PluginsLoadWidget() {
                 if (dragData is DragData.Image) {
 //                    println(dragData.readImage().toString())
                 } else if (dragData is DragData.FilesList) {
-                    dragData.readFiles().first().let {
-                        rememberCoroutineScope.launch(Dispatchers.IO) {
-//                            NsdManagerUtils.Instance.sendFile(it)
+                    val files = dragData.readFiles()
+                    files.forEach { fileUri ->
+                        // 稳健解析本地路径：兼容 Windows 的 file:/// 协议
+                        val path = try {
+                            java.io.File(java.net.URI(fileUri)).absolutePath
+                        } catch (e: Exception) {
+                            fileUri.substringAfter("file:/").replace("%20", " ")
+                        }
+                        
+                        println("Targeting Plugin Path: $path")
+                        
+                        // 仅处理 jar 或 apk
+                        if (path.endsWith(".jar", ignoreCase = true) || path.endsWith(".apk", ignoreCase = true)) {
+                            // 1. 智能加载：尝试已知插件类名
+                            val candidates = listOf("com.zzx.plugin.ImagePlugin", "com.zzx.plugin.SamplePlugin")
+                            var loadedPlugin: com.zzx.common.plugin.IPlugin? = null
+                            
+                            for (className in candidates) {
+                                try {
+                                    val plugin = PluginLoader().loadPlugin(path, className)
+                                    if (plugin != null) {
+                                        loadedPlugin = plugin
+                                        println("Successfully loaded plugin class: $className")
+                                        break
+                                    }
+                                } catch (e: Exception) {
+                                    // 继续尝试下一个
+                                }
+                            }
+
+                            if (loadedPlugin != null) {
+                                PluginManager.addPlugin(loadedPlugin)
+                            } else {
+                                println("Failed to find any matching IPlugin implementation in: $path")
+                            }
+                            
+                            // 2. 远程发送：将插件推送至手机端
+                            rememberCoroutineScope.launch(Dispatchers.IO) {
+                                try {
+                                    NsdManagerUtils.Instance.sendFile(path)
+                                    println("Universal Plugin sent to mobile: $path")
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
                         }
                     }
                 }

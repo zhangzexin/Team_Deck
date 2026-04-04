@@ -1,5 +1,7 @@
 package com.zzx.desktop.teamdeck.socket
 
+import com.zzx.desktop.teamdeck.utils.NetUtils
+
 import java.net.InetAddress
 import javax.jmdns.JmDNS
 import javax.jmdns.ServiceEvent
@@ -11,8 +13,9 @@ class MdnsUtils {
     var jmdns: JmDNS?
 
     constructor() {
-        val address = InetAddress.getLocalHost()
+        val address = NetUtils.getLocalHostAddress()
         val hostname = address.hostName
+        println("mDNS binding to address: ${address.hostAddress}")
         jmdns = JmDNS.create(address, hostname)
     }
 
@@ -25,8 +28,11 @@ class MdnsUtils {
     fun setUp(port: Int) {
         val serviceType = "_http._tcp."
         val serverName = "Team Deck Server"
+        // 注册前先尝试注销所有旧服务，确保不卡在 Probing 状态
+        jmdns?.unregisterAllServices()
         val serviceInfo = ServiceInfo.create(serviceType, serverName, port,"活动板甲控制器")
         //注册服务
+        println("Registering mDNS service: $serverName ($serviceType) on port $port")
         jmdns?.registerService(serviceInfo)
         jmdns?.addServiceTypeListener(object : ServiceTypeListener{
             override fun serviceTypeAdded(event: ServiceEvent?) {
@@ -59,6 +65,7 @@ class MdnsUtils {
 
     fun stop() {
         jmdns?.unregisterAllServices()
+        println("mDNS services unregistered.")
     }
 
 
