@@ -23,34 +23,12 @@ class OutFileHandler : FileMsgInterface {
             ByteType.BYTE_FILE_READY -> {
                 println("BYTE_FILE_READY")
                 if (state == ByteType.BYTE_FILE_HEAD || state == ByteType.BYTE_FILE_READY) {
-//                        val body = ByteBuffer.allocate(16 * 1024)
-//                        if (read(body) > 0) {
-//                            body.put(ByteType.BYTE_FILE_BODY)
-//                            body.flip()
-//                            webSocket.send(body!!.toByteString())
-//                            body.clear()
-//                        } else {
-//                            close()
-//                            state = ByteType.BYTE_FILE_FINSH
-//                            body.clear()
-//                            body.put(ByteType.BYTE_FILE_FINSH)
-//                            body.put(ByteType.MARK_FINSH.toByteArray())
-//                            body.flip()
-//                            webSocket.send(body.toByteString())
-//                        }
                     inputByteChannel?.apply {
                         state = ByteType.BYTE_FILE_READY
                         SocketFileHelper.pushFileV2(this, webSocket) {
                             state = ByteType.BYTE_FILE_FINSH
                         }
                     }
-
-//                    pluginpath?.let {
-//                        state = ByteType.BYTE_FILE_READY
-//                        SocketFileHelper.pushFile(it, webSocket) {
-//                            state = ByteType.BYTE_FILE_FINSH
-//                        }
-//                    }
                 }
             }
 
@@ -81,12 +59,26 @@ class OutFileHandler : FileMsgInterface {
 
     //发送指定文件
     suspend fun sendFile(path: String, webSocket: WebSocket) {
-        if (state == ByteType.BYTE_FILE_INIT) {
-            state = ByteType.BYTE_FILE_HEAD
-            pluginpath = path
-            inputByteChannel = SocketFileHelper.pushFileInof(path, webSocket)
-        } else {
-            throw IllegalStateException("request reset OutFileHandler state")
+        if (state != ByteType.BYTE_FILE_INIT) {
+            println("OutFileHandler: Auto-resetting stale state ($state)")
+            reset()
         }
+        
+        state = ByteType.BYTE_FILE_HEAD
+        pluginpath = path
+        inputByteChannel = SocketFileHelper.pushFileInof(path, webSocket)
+    }
+
+    private suspend fun reset() {
+        withContext(Dispatchers.IO) {
+            try {
+                inputByteChannel?.close()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        inputByteChannel = null
+        pluginpath = null
+        state = ByteType.BYTE_FILE_INIT
     }
 }

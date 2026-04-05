@@ -85,8 +85,6 @@ class InputFileHandler : FileMsgInterface {
                             receivedBytes.toFloat() / fileInfo!!.fileSize.toFloat()
                         } else 0f
                         PluginManager.updateProgress(fileInfo!!.filename, progress)
-                        
-                        pushFileReady(webSocket)
                     }
                 }
 
@@ -147,7 +145,6 @@ class InputFileHandler : FileMsgInterface {
             null
         }
         fileInfo = null
-        plugindir = null
         receivedBytes = 0L
     }
 
