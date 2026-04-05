@@ -19,10 +19,16 @@ interface IPlugin {
     fun AppUI()
 
     /**
-     * Desktop 电脑端展示的 UI
+     * Desktop 电脑端展示的 UI (作为网格中的卡片)
      */
     @Composable
     fun DesktopUI()
+
+    /**
+     * Desktop 电脑端展示的详尽设置页面 (点击卡片后进入)
+     */
+    @Composable
+    fun SettingsUI()
 
     /**
      * 业务逻辑触发回调

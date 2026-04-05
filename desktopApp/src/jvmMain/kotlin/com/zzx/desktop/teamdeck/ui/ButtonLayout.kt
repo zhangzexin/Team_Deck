@@ -12,11 +12,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.zzx.common.plugin.IPlugin
 import com.zzx.common.plugin.PluginManager
 import com.zzx.desktop.teamdeck.md_theme_dark_outlineVariant
 
 @Composable
-fun ButtonLayout() {
+fun ButtonLayout(onPluginClick: (IPlugin) -> Unit) {
     var number by remember {
         mutableStateOf(6)
     }
@@ -28,19 +29,18 @@ fun ButtonLayout() {
             val width = this@BoxWithConstraints.maxWidth - 20.dp
             val height = this@BoxWithConstraints.maxHeight - 20.dp
             val fix_h = number / fix_w
-//                    val baseButton = if (fix_h < fix_w) height/fix_w else width/fix_h
             val baseButton = 100.dp
             val h = (height / baseButton).toInt()
             val w = (width / baseButton).toInt()
             val sw = (width - (baseButton * w)) / w
             val sh = (height - (baseButton * h)) / h
-            ItemBuild(h * w, w, sw, sh, baseButton)
+            ItemBuild(h * w, w, sw, sh, baseButton, onPluginClick)
         }
     }
 }
 
 @Composable
-private fun ItemBuild(n: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp) {
+private fun ItemBuild(n: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp, onPluginClick: (IPlugin) -> Unit) {
     val pluginsState = PluginManager.pluginFlow.collectAsState()
     val loadedPlugins = pluginsState.value
 
@@ -59,11 +59,13 @@ private fun ItemBuild(n: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp) {
                     .clip(RoundedCornerShape(16.dp))
                     .size(baseButton, baseButton)
                     .clickable {
-                        plugin.onTrigger("click")
+                        // [核心改进] 点击插件后，不再内部弹窗，而是通知宿主切换至全屏设置页
+                        onPluginClick(plugin)
                     },
                 colors = CardDefaults.cardColors(containerColor = Color.Transparent)
             ) {
-                plugin.AppUI()
+                // 在网格中依然使用 DesktopUI 渲染卡片缩略图
+                plugin.DesktopUI()
             }
         }
         

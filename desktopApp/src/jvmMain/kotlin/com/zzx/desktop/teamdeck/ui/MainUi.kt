@@ -34,6 +34,10 @@ fun App1() {
     }
     val items = listOf("Home" to Icons.Outlined.Home, "Plugins" to Icons.Outlined.Favorite)
     var selectedItem by remember { mutableStateOf(items[0]) }
+    
+    // [新架构] 激活中的插件设置状态
+    var activeSettingsPlugin by remember { mutableStateOf<com.zzx.common.plugin.IPlugin?>(null) }
+    
     val rememberCoroutineScope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         FlowBus.with<Message<InitUiEvent>>(CodeEnum.INITUI.name).register(this) {
@@ -73,13 +77,20 @@ fun App1() {
                     selectedItem = item
                 }
             )
-            RootContent{
-                when(selectedItem.first) {
-                    "Home" -> 0
-                    "Plugins" -> 1
-                    else -> {0}
+            RootContent(
+                activePlugin = activeSettingsPlugin,
+                onBack = { activeSettingsPlugin = null },
+                pageIndex = {
+                    when(selectedItem.first) {
+                        "Home" -> 0
+                        "Plugins" -> 1
+                        else -> {0}
+                    }
+                },
+                onPluginClick = { plugin ->
+                    activeSettingsPlugin = plugin
                 }
-            }
+            )
         }
     }
 }

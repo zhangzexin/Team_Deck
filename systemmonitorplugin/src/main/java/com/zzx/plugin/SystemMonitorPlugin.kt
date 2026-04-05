@@ -179,48 +179,71 @@ class SystemMonitorPlugin : IPlugin {
 
     @Composable
     override fun DesktopUI() {
-        var showSettings by remember { mutableStateOf(false) }
         val state by usageState.collectAsState()
+        // [核心改进] DesktopUI 还原为简洁预览卡片，不再包含设置逻辑
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text("监控: ${state.mode}", fontSize = 12.sp)
+            Text(
+                "${if(state.mode == "CPU") state.cpuUsage.toInt() else state.gpuUsage.toInt()}%",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text("点击进入配置", fontSize = 10.sp, color = Color.Gray)
+        }
+    }
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable { showSettings = true } // 桌面端点击打开设置
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+    @Composable
+    override fun SettingsUI() {
+        val state by usageState.collectAsState()
+        // [新架构] 插件自研的配置详情页
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Text("外观设置", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text("系统状态 (${state.mode})", fontSize = 12.sp)
-                Text(
-                    "${if(state.mode == "CPU") state.cpuUsage.toInt() else state.gpuUsage.toInt()}%",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text("点击配置字体", fontSize = 10.sp, color = Color.Gray)
+                Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+                    Text("卡片字体大小: ${state.fontSize.toInt()}")
+                    Slider(
+                        value = state.fontSize,
+                        onValueChange = { 
+                            usageState.value = usageState.value.copy(fontSize = it)
+                            syncToRemote()
+                        },
+                        valueRange = 10f..40f
+                    )
+                }
             }
 
-            if (showSettings) {
-                AlertDialog(
-                    onDismissRequest = { showSettings = false },
-                    title = { Text("插件设置") },
-                    text = {
-                        Column {
-                            Text("调节 UI 字体大小: ${state.fontSize.toInt()}")
-                            Slider(
-                                value = state.fontSize,
-                                onValueChange = { 
-                                    usageState.value = usageState.value.copy(fontSize = it)
-                                    syncToRemote()
-                                },
-                                valueRange = 10f..30f
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        Button(onClick = { showSettings = false }) { Text("完成") }
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Text("数据源设置", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("当前显示模式:")
+                Spacer(modifier = Modifier.width(12.dp))
+                Button(
+                    onClick = { 
+                        val newMode = if (state.mode == "CPU") "GPU" else "CPU"
+                        usageState.value = state.copy(mode = newMode)
+                        syncToRemote()
                     }
-                )
+                ) {
+                    Text("切换为 ${if (state.mode == "CPU") "GPU" else "CPU"}")
+                }
             }
         }
     }
