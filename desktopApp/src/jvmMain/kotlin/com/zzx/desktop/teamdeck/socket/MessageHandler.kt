@@ -47,6 +47,11 @@ object MessageHandler {
                 is ItemConfigMessageType -> FlowBus.with<Message<ItemConfigEvent>>(msgAdapter.code.name)
                     .post(coroutineScope, msgAdapter.buildMessage(gson, msg))
 
+                is PluginCustomMessageType -> {
+                    val pluginMsg = msgAdapter.buildMessage(gson, msg) as Message<PluginCustomEvent>
+                    com.zzx.common.plugin.PluginManager.dispatchPluginMessage(pluginMsg.data.pluginId, pluginMsg.data.data)
+                }
+
                 null -> {}
             }
         } catch (e: Exception) {
@@ -56,10 +61,11 @@ object MessageHandler {
 
     private fun buildMessageAdapter(simpleMessage: SimpleMessage): BaseMessageType<*>? {
         return when (simpleMessage.code) {
-            CodeEnum.ERROR.ordinal -> ErrorMessageType
-            CodeEnum.INIT.ordinal -> InitMessageType
-            CodeEnum.INITUI.ordinal -> InitUiMessageType
-            CodeEnum.ITEMCONFIG.ordinal -> ItemConfigMessageType
+            CodeEnum.ERROR.value -> ErrorMessageType
+            CodeEnum.INIT.value -> InitMessageType
+            CodeEnum.INITUI.value -> InitUiMessageType
+            CodeEnum.ITEMCONFIG.value -> ItemConfigMessageType
+            CodeEnum.PLUGIN_CUSTOM.value -> PluginCustomMessageType
             else -> null
         }
     }

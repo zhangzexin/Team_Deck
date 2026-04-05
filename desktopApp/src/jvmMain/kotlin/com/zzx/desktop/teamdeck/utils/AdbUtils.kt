@@ -25,6 +25,8 @@ object AdbUtils {
         
         println("Using ADB at: $path")
         
+        val turboPort = 54382 // 固定的极速传输端口
+        
         // 尝试获取设备列表并为每个设备执行 reverse
         try {
             val devices = getConnectedDevices(path)
@@ -32,15 +34,20 @@ object AdbUtils {
                 println("Wired Connection Notice: No USB devices found.")
                 // 即使没发现设备，也尝试对默认设备执行一次（兼容某些情况）
                 runAdbCommand(path, "reverse tcp:8888 tcp:$pcPort")
+                runAdbCommand(path, "reverse tcp:$turboPort tcp:$turboPort")
             } else {
                 devices.forEach { deviceId ->
                     println("Setting up wired connection for device: $deviceId")
+                    // 映射主消息通道
                     runAdbCommand(path, "-s $deviceId reverse tcp:8888 tcp:$pcPort")
+                    // 映射极速数据通道
+                    runAdbCommand(path, "-s $deviceId reverse tcp:$turboPort tcp:$turboPort")
                 }
             }
         } catch (e: Exception) {
             // 回退到简单模式
             runAdbCommand(path, "reverse tcp:8888 tcp:$pcPort")
+            runAdbCommand(path, "reverse tcp:$turboPort tcp:$turboPort")
         }
     }
 

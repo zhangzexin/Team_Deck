@@ -10,5 +10,5 @@ enum class CodeEnum(val value:Int) {
     INIT(1),
     INITUI(2),
     ITEMCONFIG(3),
-
+    PLUGIN_CUSTOM(10)
 }

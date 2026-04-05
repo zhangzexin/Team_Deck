@@ -104,21 +104,8 @@ actual class PluginLoader actual constructor() {
                 zipFile?.close()
             }
             
-            // 兜底方案：尝试已知类名
-            val candidates = listOf("com.zzx.plugin.ImagePlugin", "com.zzx.plugin.SamplePlugin")
-            for (className in candidates) {
-                try {
-                    val plugin = loadPlugin(pluginPath, className)
-                    if (plugin != null) {
-                        Log.d("TeamDeck", "Android Fallback success! Loaded: $className")
-                        return plugin
-                    }
-                } catch (e: Exception) {
-                    // 继续尝试
-                }
-            }
-            
-            Log.e("TeamDeck", "Auto-discovery failed for $pluginPath")
+            // 属性文件读取失败，则直接视为无效插件，不再进行盲扫猜测
+            Log.e("TeamDeck", "No valid plugin metadata found in $pluginPath. Skipping...")
             null
         } catch (e: Exception) {
             Log.e("TeamDeck", "Auto-load failed (Android): ${e.message}")

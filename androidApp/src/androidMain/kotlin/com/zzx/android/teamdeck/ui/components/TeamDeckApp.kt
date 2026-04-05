@@ -104,6 +104,23 @@ private fun ItemBuild(number: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp, viewM
     // 监听正在传输的文件进度
     val transferState = com.zzx.common.plugin.PluginManager.transferFlow.collectAsState()
     val ongoingTransfers = transferState.value.toList()
+
+    val connectionState = viewModel.webSocketHandler.isConnected.collectAsState()
+    val isConnected = connectionState.value
+    
+    LaunchedEffect(isConnected) {
+        // 【核心改进】全自动有线重连逻辑
+        // 如果当前未连接，则开启后台静默探测，每 5 秒尝试一次 localhost:8888 (USB 模式)
+        if (!isConnected) {
+            println("Auto-Connect: Device disconnected. Starting background USB probe...")
+            while (true) {
+                viewModel.connect("127.0.0.1", 8888)
+                kotlinx.coroutines.delay(5000) // 每 5 秒尝试一次
+            }
+        } else {
+            println("Auto-Connect: Device connected. Stopping probe.")
+        }
+    }
     
     LaunchedEffect(Unit) {
         launch {
@@ -113,9 +130,6 @@ private fun ItemBuild(number: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp, viewM
             }
         }
 
-        // 【新增】启动自动连接：尝试有线 (USB/ADB) 模式
-        viewModel.connect("127.0.0.1", 8888)
-        
         FlowBus.with<Message<InitEvent>>(InitMessageType.code.name).register(lifecycleOwner) {
             val json = MessageHandler.gson.toJson(
                 Message<InitUiEvent>(

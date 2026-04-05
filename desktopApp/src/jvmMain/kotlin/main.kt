@@ -57,21 +57,8 @@ fun main() = application {
 
                     // 加载本地副本以在 Desktop 端展示 UI (避免 Windows 文件锁冲突)
                     val loader = PluginLoader()
-                    val candidates = listOf("com.zzx.plugin.ImagePlugin", "com.zzx.plugin.SamplePlugin")
-                    var loadedPlugin: com.zzx.common.plugin.IPlugin? = null
-                    
-                    for (className in candidates) {
-                        try {
-                            val p = loader.loadPlugin(localCopy, className)
-                            if (p != null) {
-                                loadedPlugin = p
-                                println("Successfully loaded plugin class from main.kt: $className")
-                                break
-                            }
-                        } catch (e: Exception) {
-                            // 继续尝试
-                        }
-                    }
+                    // 使用万能探测加载器，自动从包内读取 plugin.properties
+                    val loadedPlugin = loader.loadPluginAuto(localCopy)
 
                     loadedPlugin?.let { p ->
                         com.zzx.common.plugin.PluginManager.addPlugin(p)

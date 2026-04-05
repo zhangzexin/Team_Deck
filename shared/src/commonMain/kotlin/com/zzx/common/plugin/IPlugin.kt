@@ -30,4 +30,14 @@ interface IPlugin {
      * @param params 传递参数 (JSON 或 键值对)
      */
     fun onTrigger(actionId: String, params: Map<String, String> = emptyMap())
+
+    /**
+     * 接收自定义插件数据 (用于解耦宿主与具体的业务)
+     */
+    fun onReceive(data: String) {}
+
+    /**
+     * 持有的消息发送接口，由宿主在加载时注入
+     */
+    var messageSender: ((pluginId: String, data: String) -> Unit)?
 }

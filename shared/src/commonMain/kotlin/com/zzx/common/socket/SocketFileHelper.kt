@@ -21,25 +21,54 @@ object SocketFileHelper {
         withContext(Dispatchers.IO) {
             val file = File(path)
             val newByteChannel = Files.newByteChannel(file.toPath(), StandardOpenOption.READ)
-            val body = ByteBuffer.allocate(16 * 1024)
-            body.put(ByteType.BYTE_FILE_BODY)
-            while (newByteChannel.read(body) > 0) {
-                body.flip()
-                webSocket.send(body.toByteString())
-                body.clear()
-                body.put(ByteType.BYTE_FILE_BODY)
-                count += 1
-                if (count>0 && count%20 == 0) {
-                    delay(800)
+            val bufferSize = 64 * 1024
+            val body = ByteBuffer.allocate(bufferSize)
+            
+            println("Standard push started: ${file.name} (${file.length()} bytes) using 64KB chunks")
+            try {
+                var chunkCount = 0
+                while (newByteChannel.read(body) > 0) {
+                    body.flip()
+                    // 构造：[BODY_TYPE][DATA...]
+                    val frame = ByteBuffer.allocate(body.remaining() + 1)
+                    frame.put(ByteType.BYTE_FILE_BODY)
+                    frame.put(body)
+                    frame.flip()
+                    
+                    if (!webSocket.send(frame.toByteString())) break
+                    
+                    body.clear()
+                    chunkCount++
+                    
+                    // 流量节流阀 (Flow Control): 监控 WebSocket 内部发送队列水位
+                    // 如果积压超过 2MB，则暂停发送，防止缓冲区溢出并腾出带宽给的心跳 Pong 响应
+                    while (webSocket.queueSize() > 2 * 1024 * 1024) {
+                        println("Wait for network... Current queue: ${webSocket.queueSize() / 1024} KB")
+                        delay(100)
+                        yield()
+                    }
+
+                    // 即使没有积压，每发送 1.2MB 也微呼吸一次，确保 CPU 轮转
+                    if (chunkCount % 20 == 0) {
+                        delay(2)
+                        yield()
+                    }
                 }
+                
+                // 确保数据刷新与完成帧发送
+                delay(200)
+                val finishFrame = ByteBuffer.allocate(MARK_FINSH.toByteArray().size + 1)
+                finishFrame.put(ByteType.BYTE_FILE_FINSH)
+                finishFrame.put(MARK_FINSH.toByteArray())
+                finishFrame.flip()
+                webSocket.send(finishFrame.toByteString())
+                println("Push completed successfully.")
+            } catch (e: Exception) {
+                println("Push interrupted: ${e.message}")
+            } finally {
+                newByteChannel.close()
+                changeEnd()
             }
-            body.clear()
-            body.put(ByteType.BYTE_FILE_FINSH)
-            body.put(MARK_FINSH.toByteArray())
-            body.flip()
-            webSocket.send(body.toByteString())
-            newByteChannel.close()
-            changeEnd()
         }
     }
 
@@ -67,13 +96,15 @@ object SocketFileHelper {
                 }
                 
                 // 发送结束帧
+                // 增加少量延迟，确保所有数据包在连接状态改变前已送达接收端缓冲区
+                delay(200)
                 val finishFrame = ByteBuffer.allocate(MARK_FINSH.toByteArray().size + 1)
                 finishFrame.put(ByteType.BYTE_FILE_FINSH)
                 finishFrame.put(MARK_FINSH.toByteArray())
                 finishFrame.flip()
-                webSocket.send(finishFrame.toByteString())
-                
-                println("Streaming finish: File sent successfully.")
+                if (webSocket.send(finishFrame.toByteString())) {
+                    println("Streaming finish: File sent successfully.")
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {

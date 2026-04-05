@@ -51,25 +51,32 @@ val generatePluginProperties by tasks.registering {
 }
 
 tasks.register<Zip>("packageUniversalApk") {
+    // 确保依赖的任务已完成
+    dependsOn("assembleDebug")
     dependsOn(generatePluginProperties)
+    
     archiveFileName.set("universal-image-plugin.apk")
     destinationDirectory.set(layout.buildDirectory.dir("libs"))
 
-    // 1. 包含编译后的 .class 文件 (用于 Desktop JVM 加载)
-    from(layout.buildDirectory.dir("intermediates/javac/debug/classes"))
-    from(layout.buildDirectory.dir("tmp/kotlin-classes/debug"))
-    
-    // 2. 包含生成的插件元数据
+    // 1. 优先包含最新生成的插件元数据 (真理来源)
     from(generatePluginProperties.map { it.outputs.files.singleFile }) {
         into("/")
     }
-    
-    // 3. 包含 Android APK 的全部内容 (DEX, 资源, 清单文件)
-    dependsOn("assembleDebug")
+
+    // 2. 将安卓 APK 的内容作为底座 (此时包含 DEX, 资源, 签名清单)
     from(zipTree(layout.buildDirectory.file("outputs/apk/debug/imageplugin-debug.apk"))) {
         exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
     }
+
+    // 3. 包含编译后的 .class 文件
+    from(layout.buildDirectory.dir("intermediates/javac/debug/classes")) {
+        include("**/*.class")
+    }
+    from(layout.buildDirectory.dir("tmp/kotlin-classes/debug")) {
+        include("**/*.class")
+    }
     
+    // 强制使用 EXCLUDE，保证最新元数据覆盖旧包内容
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 

@@ -125,6 +125,52 @@ class InputFileHandler : FileMsgInterface {
                     }
                 }
 
+                ByteType.BYTE_FILE_TURBO_START -> {
+                    // [核心改进] 极速涡轮模式握手
+                    if (state == ByteType.BYTE_FILE_READY && fileInfo != null) {
+                        val port = ByteBuffer.wrap(newByteArray).getInt()
+                        val targetPath = plugindir + "/" + fileInfo!!.filename
+                        println("[InputFileHandler] Entering Turbo mode! Connecting to localhost:$port")
+                        
+                        // 启动 Raw TCP 接收
+                        val success = TurboFileHelper.receiveTurboFile("127.0.0.1", port, targetPath)
+                        
+                        if (success) {
+                            println("[InputFileHandler] >>> 🚀 TURBO MODE ENABLED <<<")
+                            PluginManager.updateStatus("🚀已连通涡轮极速通道")
+                            PluginManager.updateProgress(fileInfo!!.filename, 1.0f)
+                            
+                            val fileName = fileInfo?.filename
+                            val filePath = plugindir + "/" + fileName
+                            val currentFileName = fileName
+                            
+                            reset()
+                            currentFileName?.let { PluginManager.clearProgress(it) }
+                            
+                            if (fileName != null && (fileName.endsWith(".apk") || fileName.endsWith(".aar") || fileName.endsWith(".jar"))) {
+                                println("Turbo: Android attempting auto-load for plugin: $fileName")
+                                val loadedPlugin = pluginLoader?.loadPluginAuto(filePath)
+                                if (loadedPlugin != null) {
+                                    println("Turbo: Android successfully auto-loaded plugin: ${loadedPlugin.name}")
+                                    PluginManager.addPlugin(loadedPlugin)
+                                }
+                            }
+                            
+                            // 通知发送端：我们已搞定
+                            FileHelper.senFileEnd(webSocket)
+                        } else {
+                            println("[InputFileHandler] >>> ⚠️ FALLBACK TO WEBSOCKET <<<")
+                            PluginManager.updateStatus("⚠️ 极速通道未通，回退标准模式")
+                            // 这里我们发送一个 ERROR 指令给桌面端，示意它回退到旧模式
+                            val errorFrame = ByteBuffer.allocate(1)
+                            errorFrame.put(ByteType.BYTE_FILE_ERROR)
+                            webSocket.send(errorFrame.array().toByteString())
+                            
+                            reset()
+                        }
+                    }
+                }
+
                 ByteType.BYTE_FILE_ERROR -> {
                     state = ByteType.BYTE_FILE_ERROR
                     fileInfo?.filename?.let { PluginManager.clearProgress(it) }

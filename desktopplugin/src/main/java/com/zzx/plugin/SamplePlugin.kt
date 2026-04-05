@@ -16,6 +16,7 @@ import com.zzx.common.plugin.IPlugin
 class SamplePlugin : IPlugin {
     override val id: String = "sample_plugin_01"
     override val name: String = "示例开关"
+    override var messageSender: ((pluginId: String, data: String) -> Unit)? = null
 
     @Composable
     override fun AppUI() {

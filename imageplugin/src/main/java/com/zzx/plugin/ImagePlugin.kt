@@ -19,6 +19,7 @@ import com.zzx.common.util.ImageDecoder
 class ImagePlugin : IPlugin {
     override val id: String = "plugin_image_module_demo"
     override val name: String = "Image Module"
+    override var messageSender: ((pluginId: String, data: String) -> Unit)? = null
 
     @Composable
     override fun AppUI() {

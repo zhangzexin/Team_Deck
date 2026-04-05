@@ -8,6 +8,7 @@ object ByteType {
     val BYTE_FILE_FINSH: Byte = 4
     val BYTE_FILE_END: Byte = 5
     val BYTE_FILE_ERROR: Byte = -1
+    val BYTE_FILE_TURBO_START: Byte = 10 // 开启极速 USB (Raw TCP) 传输指令
 
     val MARK_READY = "READY"
     val MARK_END = "END"

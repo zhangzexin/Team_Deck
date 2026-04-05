@@ -21,13 +21,18 @@ import javax.net.ssl.SSLSocketFactory
 
 
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
     private val _connectionSuccessEvent = MutableSharedFlow<Boolean>(extraBufferCapacity = 1)
     val connectionSuccessEvent = _connectionSuccessEvent.asSharedFlow()
+    
+    private val _isConnectedFlow = MutableStateFlow(false)
+    val isConnected = _isConnectedFlow.asStateFlow()
+    
     private var _isConnected = false
-
     private val TAG: String = "TeamDeck-Net"
     private var webClient: OkHttpClient? = null
     private var webSocket: WebSocket? = null
@@ -39,11 +44,17 @@ class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
          * messages.
          */
         override fun onOpen(webSocket: WebSocket, response: Response) {
+            _isConnectedFlow.value = true
             _isConnected = true
             val host = response.request.url.host
             val isWired = host == "127.0.0.1" || host == "localhost"
             Log.d(TAG, "onOpen: Success! Connected to $host (Wired: $isWired)")
             
+            // 注入通用消息发送钩子
+            com.zzx.common.plugin.PluginManager.globalMessageSender = { content ->
+                webSocket.send(content)
+            }
+
             _connectionSuccessEvent.tryEmit(isWired)
         }
 
@@ -74,6 +85,7 @@ class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
          */
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             Log.d(TAG, "onClosed: code:$code reason:$reason")
+            _isConnectedFlow.value = false
             _isConnected = false
             webSocket.close(1000, null)
         }
@@ -86,6 +98,7 @@ class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             Log.e(TAG, "onFailure: Connection error! Response: $response, Error: $t")
             t.printStackTrace()
+            _isConnectedFlow.value = false
             _isConnected = false
         }
     }
@@ -102,10 +115,10 @@ class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
             })
             .protocols(listOf(Protocol.HTTP_1_1)) // 锁定协议，跳过 HTTP/2 协商
             .retryOnConnectionFailure(true)//允许失败重试
-            .pingInterval(30,TimeUnit.SECONDS) //心跳
-            .readTimeout(30,TimeUnit.SECONDS)//设置读取超时时间
-            .writeTimeout(30,TimeUnit.SECONDS)//设置写入超时时间
-            .connectTimeout(3,TimeUnit.SECONDS)//设置连接超时时间
+            .pingInterval(30,TimeUnit.SECONDS) // 恢复到 30s，配合发送端的 Micro-Delay
+            .readTimeout(90,TimeUnit.SECONDS)// 进一步放宽读取超时至 90s
+            .writeTimeout(90,TimeUnit.SECONDS)// 进一步放宽写入超时至 90s
+            .connectTimeout(10,TimeUnit.SECONDS)// 连接超时设置得更从容一些
             .build()
         val webSocketUrl = "ws://${hostName}:${port}"
         Log.d(TAG, "Initiating Connection to: $webSocketUrl")

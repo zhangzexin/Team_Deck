@@ -59,6 +59,11 @@ class NsdManagerUtils {
             }
             _isConnected.value = true
 
+            // 注入通用消息发送钩子
+            com.zzx.common.plugin.PluginManager.globalMessageSender = { content ->
+                mWebSocket?.send(content)
+            }
+
             // 当 websocket 连接打开时，发送一条欢迎消息
             val initEvent = InitEvent(emptyList())
             val message = Message<InitEvent>(code = CodeEnum.INIT.value, msg = "连接成功", initEvent)

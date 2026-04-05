@@ -41,3 +41,4 @@ dependencyResolutionManagement {
 }
 include(":desktopplugin")
 include(":imageplugin")
+include(":systemmonitorplugin")
