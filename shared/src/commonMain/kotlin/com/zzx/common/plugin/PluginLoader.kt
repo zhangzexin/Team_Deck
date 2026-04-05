@@ -5,7 +5,12 @@ package com.zzx.common.plugin
  */
 expect class PluginLoader() {
     /**
-     * 核心加载逻辑，平台各自实现
+     * 指定启动类加载插件
      */
     fun loadPlugin(pluginPath: String, mainClass: String): IPlugin?
+
+    /**
+     * 自动从 plugin.properties 探测并加载插件
+     */
+    fun loadPluginAuto(pluginPath: String): IPlugin?
 }

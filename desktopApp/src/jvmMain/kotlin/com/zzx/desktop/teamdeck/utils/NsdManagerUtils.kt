@@ -21,12 +21,21 @@ import okio.ByteString
 import java.net.InetAddress
 import javax.net.ssl.SSLSocketFactory
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 class NsdManagerUtils {
     var mMockWebSocket: CMockWebServer? = null
     var coroutineScope: CoroutineScope? = null
     val mOutFileHandler = OutFileHandler()
     var mWebSocket: WebSocket? = null
 
+    // 连接状态与类型
+    private val _isConnected = MutableStateFlow(false)
+    val isConnected = _isConnected.asStateFlow()
+
+    private val _connectionType = MutableStateFlow("未连接") // "有线 (USB)", "无线 (WiFi)", "未连接"
+    val connectionType = _connectionType.asStateFlow()
 
     companion object {
         val Instance by lazy {
@@ -38,6 +47,18 @@ class NsdManagerUtils {
         val gson = Gson()
         override fun onOpen(webSocket: WebSocket, response: Response) {
             mWebSocket = webSocket
+            
+            // 判定连接类型 (ADB Reverse 通常会显示为 127.0.0.1)
+            val host = response.request.url.host
+            println("New connection from host: $host")
+            
+            if (host == "127.0.0.1" || host == "localhost") {
+                _connectionType.value = "有线 (USB/ADB)"
+            } else {
+                _connectionType.value = "无线 (WiFi)"
+            }
+            _isConnected.value = true
+
             // 当 websocket 连接打开时，发送一条欢迎消息
             val initEvent = InitEvent(emptyList())
             val message = Message<InitEvent>(code = CodeEnum.INIT.value, msg = "连接成功", initEvent)
@@ -68,12 +89,16 @@ class NsdManagerUtils {
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             // 当 websocket 连接关闭时，打印关闭原因
             println("WebSocket closed: $code $reason")
+            _isConnected.value = false
+            _connectionType.value = "未连接"
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             // 当 websocket 连接出现异常时，打印异常信息
             println("WebSocket onFailure: ${t.toString()} ")
             t.printStackTrace()
+            _isConnected.value = false
+            _connectionType.value = "未连接"
         }
     }
 
@@ -104,13 +129,22 @@ class NsdManagerUtils {
 
         // 将响应添加到队列中
         mMockWebSocket?.enqueue(mockResponse)
-        val address = NetUtils.getLocalHostAddress()
-        mMockWebSocket?.start(address, 0)
-        // 获取服务器的 URL
-        val serverUrl = mMockWebSocket?.url("/")
+        val lanAddress = NetUtils.getLocalHostAddress()
+        // 绑定到 0.0.0.0 以支持 localhost (USB) 和局域网 (WiFi)
+        mMockWebSocket?.start(java.net.InetAddress.getByName("0.0.0.0"), 0)
+        
+        // 【新增】设置 ADB 反向代理，支持有线连接 (映射到手机端 8888 端口)
+        val actualPort = mMockWebSocket?.port ?: 0
+        if (actualPort > 0) {
+            com.zzx.desktop.teamdeck.utils.AdbUtils.ensureAdbAndReverse(actualPort)
+        }
 
-        // 打印服务器的 URL
-        println("Server URL: $serverUrl")
+        // 获取用于广播的服务器 URL (使用局域网 IP)
+        val serverUrl = "http://${lanAddress.hostAddress}:${actualPort}/"
+
+        // 打印服务器的信息
+        println("Server started on all interfaces (0.0.0.0) at port: $actualPort")
+        println("Discovery URL (WiFi): $serverUrl")
         return mMockWebSocket!!
     }
 

@@ -41,8 +41,8 @@ class MainViewModel: ViewModel() {
         _isSearch.value = isOpen
     }
 
-    fun connectionWebSocket(hostName: String, port: Int) {
-        webSocketHandler.connectionWebSocket(hostName, port)
+    fun connect(hostName: String, port: Int) {
+        webSocketHandler.connect(hostName, port)
     }
 
     fun sendMessage(msg:String) {

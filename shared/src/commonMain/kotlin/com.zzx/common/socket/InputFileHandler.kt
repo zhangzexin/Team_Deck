@@ -111,25 +111,15 @@ class InputFileHandler : FileMsgInterface {
                         println("File received: $fileName, Size: $actualReceived/$expectedSize")
 
                         if (actualReceived == expectedSize && fileName != null && (fileName.endsWith(".apk") || fileName.endsWith(".aar") || fileName.endsWith(".jar"))) {
-                            // 尝试已知插件类名
-                            val candidates = listOf("com.zzx.plugin.ImagePlugin", "com.zzx.plugin.SamplePlugin")
-                            var loadedPlugin: com.zzx.common.plugin.IPlugin? = null
+                            // 自动探测并加载插件 (使用 plugin.properties)
+                            println("Android attempting auto-load for plugin: $fileName")
+                            val loadedPlugin = pluginLoader?.loadPluginAuto(filePath)
                             
-                            for (className in candidates) {
-                                try {
-                                    val p = pluginLoader?.loadPlugin(filePath, className)
-                                    if (p != null) {
-                                        loadedPlugin = p
-                                        println("Android successfully loaded plugin class: $className")
-                                        break
-                                    }
-                                } catch (e: Exception) {
-                                    // 继续尝试
-                                }
-                            }
-
-                            loadedPlugin?.let { p ->
-                                PluginManager.addPlugin(p)
+                            if (loadedPlugin != null) {
+                                println("Android successfully auto-loaded plugin: ${loadedPlugin.name}")
+                                PluginManager.addPlugin(loadedPlugin)
+                            } else {
+                                println("Android failed to auto-discover IPlugin in: $fileName")
                             }
                         } else if (actualReceived != expectedSize) {
                             println("File integrity check failed for $fileName!")

@@ -33,6 +33,7 @@ import com.zzx.android.teamdeck.flowBus.FlowBus
 import com.zzx.android.teamdeck.socket.MessageHandler
 import com.zzx.android.teamdeck.ui.theme.AppTheme
 import com.zzx.android.teamdeck.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
 
 /**
  *@描述：
@@ -105,6 +106,16 @@ private fun ItemBuild(number: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp, viewM
     val ongoingTransfers = transferState.value.toList()
     
     LaunchedEffect(Unit) {
+        launch {
+            viewModel.webSocketHandler.connectionSuccessEvent.collect { isWired ->
+                val type = if (isWired) "有线 (USB/ADB)" else "无线 (WiFi)"
+                Toast.makeText(context, "连接成功 ($type)", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // 【新增】启动自动连接：尝试有线 (USB/ADB) 模式
+        viewModel.connect("127.0.0.1", 8888)
+        
         FlowBus.with<Message<InitEvent>>(InitMessageType.code.name).register(lifecycleOwner) {
             val json = MessageHandler.gson.toJson(
                 Message<InitUiEvent>(

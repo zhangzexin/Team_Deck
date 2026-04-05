@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.zzx.common.plugin.IPlugin
+import com.zzx.common.util.ImageDecoder
 
 /**
  * 独立 ImagePlugin 模块示例
@@ -67,28 +68,13 @@ class ImagePlugin : IPlugin {
     private fun loadPluginIcon(): ImageBitmap? {
         return try {
             val stream = this.javaClass.classLoader.getResourceAsStream("res/drawable/plugin_image.png")
-            decodeImageStream(stream)
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun decodeImageStream(stream: java.io.InputStream?): ImageBitmap? {
-        if (stream == null) return null
-        return try {
-            val bytes = stream.readBytes()
-            // Android 兼容层
-            val androidBitmap = try {
-                val factory = Class.forName("android.graphics.BitmapFactory")
-                val decodeMethod = factory.getMethod("decodeByteArray", ByteArray::class.java, Int::class.java, Int::class.java)
-                val bitmap = decodeMethod.invoke(null, bytes, 0, bytes.size)
-                val asImageBitmap = bitmap.javaClass.getMethod("asImageBitmap")
-                asImageBitmap.invoke(bitmap) as? ImageBitmap
-            } catch (e: Exception) {
+            if (stream != null) {
+                ImageDecoder.decode(stream.readBytes())
+            } else {
                 null
             }
-            androidBitmap
         } catch (e: Exception) {
+            e.printStackTrace()
             null
         }
     }

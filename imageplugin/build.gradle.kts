@@ -41,7 +41,17 @@ android {
     }
 }
 
+val generatePluginProperties by tasks.registering {
+    val outputFile = layout.buildDirectory.file("generated/plugin.properties")
+    outputs.file(outputFile)
+    doLast {
+        outputFile.get().asFile.parentFile.mkdirs()
+        outputFile.get().asFile.writeText("plugin.mainClass=com.zzx.plugin.ImagePlugin\n")
+    }
+}
+
 tasks.register<Zip>("packageUniversalApk") {
+    dependsOn(generatePluginProperties)
     archiveFileName.set("universal-image-plugin.apk")
     destinationDirectory.set(layout.buildDirectory.dir("libs"))
 
@@ -49,7 +59,12 @@ tasks.register<Zip>("packageUniversalApk") {
     from(layout.buildDirectory.dir("intermediates/javac/debug/classes"))
     from(layout.buildDirectory.dir("tmp/kotlin-classes/debug"))
     
-    // 2. 包含 Android APK 的全部内容 (DEX, 资源, 清单文件)
+    // 2. 包含生成的插件元数据
+    from(generatePluginProperties.map { it.outputs.files.singleFile }) {
+        into("/")
+    }
+    
+    // 3. 包含 Android APK 的全部内容 (DEX, 资源, 清单文件)
     dependsOn("assembleDebug")
     from(zipTree(layout.buildDirectory.file("outputs/apk/debug/imageplugin-debug.apk"))) {
         exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")

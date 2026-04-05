@@ -67,8 +67,17 @@ fun AppDrawer(viewModel: MainViewModel) {
     }
     var searchList = remember {
         mutableStateMapOf<String, NsdServiceInfo>().also {
-            // test
-//            it["12314315"] = NsdServiceInfo().also { nsd-> nsd.serviceName="test" }
+            // 预置有线连接选项 (ADB Reverse 模式)
+            try {
+                val localInfo = NsdServiceInfo().apply {
+                    serviceName = "有线连接 (USB/ADB)"
+                    host = java.net.InetAddress.getByName("127.0.0.1")
+                    port = 8888
+                }
+                it["localhost:8888"] = localInfo
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
     var isSearch = rememberSaveable {
@@ -117,7 +126,7 @@ fun AppDrawer(viewModel: MainViewModel) {
             .width(200.dp)
     ) {
         Spacer(Modifier.height(12.dp))
-        SearchButton(nsdManagerTool) { isSearch }
+        SearchButton(viewModel, nsdManagerTool) { isSearch }
         Spacer(Modifier.height(12.dp))
 
         Box {
@@ -201,7 +210,7 @@ fun SearchDialog(
                 onConfirmation = {
                     connectionInfo().value = null
                     viewModel.closeDrawer(scope)
-                    viewModel.connectionWebSocket(
+                    viewModel.connect(
                         connectionInfo.host.hostAddress,
                         connectionInfo.port
                     )
@@ -216,7 +225,7 @@ fun SearchDialog(
 }
 
 @Composable
-fun SearchButton(nsdManagerTool: NsdManagerTool, isSearch: () -> MutableState<Boolean>) {
+fun SearchButton(viewModel: MainViewModel, nsdManagerTool: NsdManagerTool, isSearch: () -> MutableState<Boolean>) {
 
     val scope = rememberCoroutineScope()
     val inversePrimary = MaterialTheme.colorScheme.inversePrimary
@@ -235,15 +244,30 @@ fun SearchButton(nsdManagerTool: NsdManagerTool, isSearch: () -> MutableState<Bo
         label = { Text(getString()) },
         selected = isSearch().value,
         onClick = {
+            val startingSearch = !isSearch().value
             scope.launch(Dispatchers.IO) {
-//                                drawerState.close()
-                if (isSearch().value) {
+                if (startingSearch) {
                     nsdManagerTool.start()
+                    
+                    // 【新增】有线优先策略：并行尝试 localhost:8888 (ADB Reverse)
+                    println("Wired Priority: Attempting immediate connection to localhost:8888")
+                    viewModel.connect("127.0.0.1", 8888)
+                    
+                    // 监听有线连接成功，若成功则停止 WiFi 扫描以节省资源
+                    launch {
+                        viewModel.webSocketHandler.connectionSuccessEvent.collect { isWired ->
+                            if (isWired) {
+                                println("Wired Priority: Localhost connected, stopping mDNS.")
+                                nsdManagerTool.stop()
+                                isSearch().value = false
+                            }
+                        }
+                    }
                 } else {
                     nsdManagerTool.stop()
                 }
             }
-            isSearch().value = !isSearch().value
+            isSearch().value = startingSearch
         },
         colors = NavigationDrawerItemDefaults.colors(
             unselectedTextColor = MaterialTheme.colorScheme.inversePrimary,

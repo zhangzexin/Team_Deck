@@ -20,7 +20,13 @@ import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLSocketFactory
 
 
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+
 class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
+    private val _connectionSuccessEvent = MutableSharedFlow<Boolean>(extraBufferCapacity = 1)
+    val connectionSuccessEvent = _connectionSuccessEvent.asSharedFlow()
+    private var _isConnected = false
 
     private val TAG: String = "TeamDeck-Net"
     private var webClient: OkHttpClient? = null
@@ -33,8 +39,12 @@ class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
          * messages.
          */
         override fun onOpen(webSocket: WebSocket, response: Response) {
-            Log.d(TAG, "onOpen: Success! Handshake complete.")
-//            webSocket?.send("你好")
+            _isConnected = true
+            val host = response.request.url.host
+            val isWired = host == "127.0.0.1" || host == "localhost"
+            Log.d(TAG, "onOpen: Success! Connected to $host (Wired: $isWired)")
+            
+            _connectionSuccessEvent.tryEmit(isWired)
         }
 
         /** Invoked when a text (type `0x1`) message has been received. */
@@ -64,6 +74,8 @@ class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
          */
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             Log.d(TAG, "onClosed: code:$code reason:$reason")
+            _isConnected = false
+            webSocket.close(1000, null)
         }
 
         /**
@@ -74,13 +86,12 @@ class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             Log.e(TAG, "onFailure: Connection error! Response: $response, Error: $t")
             t.printStackTrace()
+            _isConnected = false
         }
     }
 
-    fun connectionWebSocket(hostName: String, port: Int) {
-        if (webSocket != null) {
-            return
-        }
+    fun connect(hostName: String, port: Int) {
+        Log.d(TAG, "Attempting connection to $hostName:$port")
         val factory: SSLSocketFactory? = RxUtils.createSSLSocketFactory()
         webClient = OkHttpClient.Builder()
             .dns(object : Dns {
