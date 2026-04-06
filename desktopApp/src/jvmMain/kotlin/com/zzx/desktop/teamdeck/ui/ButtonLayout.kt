@@ -8,13 +8,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import com.zzx.common.plugin.IPlugin
 import com.zzx.common.plugin.PluginManager
 import com.zzx.desktop.teamdeck.md_theme_dark_outlineVariant
+import com.zzx.desktop.teamdeck.ui.manager.LocalPluginDragState
 
 @Composable
 fun ButtonLayout(onPluginClick: (IPlugin) -> Unit) {
@@ -43,6 +50,7 @@ fun ButtonLayout(onPluginClick: (IPlugin) -> Unit) {
 private fun ItemBuild(n: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp, onPluginClick: (IPlugin) -> Unit) {
     val pluginsState = PluginManager.pluginFlow.collectAsState()
     val loadedPlugins = pluginsState.value
+    val dragState = LocalPluginDragState.current
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(w),
@@ -54,18 +62,44 @@ private fun ItemBuild(n: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp, onPluginCl
         // 1. 渲染已加载的插件
         items(loadedPlugins.size) { index ->
             val plugin = loadedPlugins[index]
+            val isBeingDragged = dragState.isDragging && dragState.draggedPlugin?.id == plugin.id
+            
+            var itemOffset by remember { mutableStateOf(Offset.Zero) }
             Card(
                 modifier = Modifier
                     .clip(RoundedCornerShape(16.dp))
                     .size(baseButton, baseButton)
+                    .onGloballyPositioned { layoutCoordinates ->
+                        itemOffset = layoutCoordinates.positionInWindow()
+                    }
+                    .pointerInput(plugin.id) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { pointerOffset ->
+                                dragState.startDrag(plugin, itemOffset) 
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                dragState.updateOffset(dragAmount)
+                            },
+                            onDragEnd = {
+                                dragState.endDrag()
+                            },
+                            onDragCancel = {
+                                dragState.endDrag()
+                            }
+                        )
+                    }
                     .clickable {
-                        // [核心改进] 点击插件后，不再内部弹窗，而是通知宿主切换至全屏设置页
                         onPluginClick(plugin)
                     },
-                colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isBeingDragged) Color.Gray.copy(alpha = 0.5f) else Color.Transparent
+                )
             ) {
                 // 在网格中依然使用 DesktopUI 渲染卡片缩略图
-                plugin.DesktopUI()
+                Box(modifier = Modifier.alpha(if (isBeingDragged) 0.3f else 1f)) {
+                    plugin.DesktopUI()
+                }
             }
         }
         

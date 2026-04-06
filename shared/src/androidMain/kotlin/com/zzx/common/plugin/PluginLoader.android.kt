@@ -42,6 +42,7 @@ actual class PluginLoader actual constructor() {
             Log.d("TeamDeck", "Instance created: ${instance.javaClass.name}")
             if (instance is IPlugin) {
                 Log.d("TeamDeck", "Successfully cast to IPlugin")
+                PluginManager.registerSourcePath(instance.id, pluginPath)
                 instance
             } else {
                 Log.e("TeamDeck", "Cast failed! Instance implements: ${instance.javaClass.interfaces.joinToString { it.name }}")

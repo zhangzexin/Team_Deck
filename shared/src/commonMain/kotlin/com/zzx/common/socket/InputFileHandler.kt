@@ -134,6 +134,8 @@ class InputFileHandler : FileMsgInterface {
 
                         if (actualReceived == expectedSize && fileName != null && (fileName.endsWith(".apk") || fileName.endsWith(".aar") || fileName.endsWith(".jar"))) {
                             println("Android attempting auto-load for plugin: $fileName")
+                            // [核心修复] 延迟 250ms 以确保文件通道彻底关闭并刷新到磁盘，避免 ZipException (EOCD not found)
+                            kotlinx.coroutines.delay(250)
                             val loadedPlugin = pluginLoader?.loadPluginAuto(filePath)
                             if (loadedPlugin != null) {
                                 println("Android successfully auto-loaded plugin: ${loadedPlugin.name}")

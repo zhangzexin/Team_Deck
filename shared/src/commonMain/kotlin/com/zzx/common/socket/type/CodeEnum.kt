@@ -11,5 +11,6 @@ enum class CodeEnum(val value:Int) {
     INITUI(2),
     ITEMCONFIG(3),
     PLUGIN_CUSTOM(10),
-    PLUGIN_UNINSTALL(11)
+    PLUGIN_UNINSTALL(11),
+    SYNC_PLUGINS(12)
 }

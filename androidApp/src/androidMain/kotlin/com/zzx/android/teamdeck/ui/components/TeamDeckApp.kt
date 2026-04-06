@@ -3,7 +3,9 @@ package com.zzx.android.teamdeck.ui.components
 import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -42,7 +44,7 @@ import kotlinx.coroutines.launch
  *@author:zhangzexin
  */
 @SuppressLint("StateFlowValueCalledInComposition")
-@OptIn(ExperimentalMaterialApi::class)
+@OptIn(ExperimentalMaterialApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun TeamDeckApp(viewModel: MainViewModel) {
     AppTheme {
@@ -94,6 +96,7 @@ fun TeamDeckApp(viewModel: MainViewModel) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ItemBuild(number: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp, viewModel: MainViewModel) {
     val context = LocalContext.current
@@ -132,16 +135,47 @@ private fun ItemBuild(number: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp, viewM
         }
 
         FlowBus.with<Message<InitEvent>>(InitMessageType.code.name).register(lifecycleOwner) {
+            val loadedIds = com.zzx.common.plugin.PluginManager.plugins.map { it.id }
             val json = MessageHandler.gson.toJson(
                 Message<InitUiEvent>(
                     CodeEnum.INITUI.value,
-                    "",
-                    InitUiEvent(number, w)
+                    "Android Inventory",
+                    InitUiEvent(number, w, loadedIds)
                 )
             )
             viewModel.sendMessage(json)
+            println("Sync: Reported local inventory to Desktop: $loadedIds")
         }
     }
+
+    var pluginToUninstall by remember { mutableStateOf<com.zzx.common.plugin.IPlugin?>(null) }
+
+    if (pluginToUninstall != null) {
+        AlertDialog(
+            onDismissRequest = { pluginToUninstall = null },
+            title = { Text("卸载插件") },
+            text = { Text("确定要卸载插件 \"${pluginToUninstall?.name}\" 吗？此操作将从手机和电脑上同步删除。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val p = pluginToUninstall
+                        pluginToUninstall = null
+                        p?.let {
+                            com.zzx.common.plugin.PluginManager.removePlugin(it.id, notifyRemote = true)
+                        }
+                    }
+                ) {
+                    Text("确定", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pluginToUninstall = null }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
     LazyVerticalGrid(
         columns = GridCells.Fixed(w),
         horizontalArrangement = Arrangement.spacedBy(sw + 1.dp),
@@ -149,12 +183,17 @@ private fun ItemBuild(number: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp, viewM
         contentPadding = PaddingValues(vertical = sh, horizontal = sw),
         userScrollEnabled = false
     ) {
-        // 1. 渲染加载完成的插件
         items(items = loadedPlugins, key = { it.id + it.hashCode() }) { plugin ->
             Card(
                 modifier = Modifier
                     .clip(RoundedCornerShape(16.dp))
-                    .size(baseButton, baseButton),
+                    .size(baseButton, baseButton)
+                    .combinedClickable(
+                        onClick = { /* 默认点击由 AppUI 内部处理或暂无逻辑 */ },
+                        onLongClick = {
+                            pluginToUninstall = plugin
+                        }
+                    ),
                 colors = CardDefaults.cardColors(containerColor = Color.Transparent)
             ) {
                 plugin.AppUI()

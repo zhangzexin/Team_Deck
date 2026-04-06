@@ -38,8 +38,14 @@ object MessageHandler {
                 is InitMessageType -> FlowBus.with<Message<InitEvent>>(msgAdapter.code.name)
                     .post(coroutineScope, msgAdapter.buildMessage(gson, msg))
 
-                is InitUiMessageType -> FlowBus.with<Message<InitUiEvent>>(msgAdapter.code.name)
-                    .post(coroutineScope, msgAdapter.buildMessage(gson, msg))
+                is InitUiMessageType -> {
+                    val event = msgAdapter.buildMessage(gson, msg) as Message<InitUiEvent>
+                    FlowBus.with<Message<InitUiEvent>>(msgAdapter.code.name)
+                        .post(coroutineScope, event)
+                    
+                    // 【关键触发】接收到手机端 UI 状态和清单后，由桌面端按需开启同步任务
+                    com.zzx.desktop.teamdeck.utils.NsdManagerUtils.Instance.syncMissingPlugins(event.data.currentPluginIds)
+                }
 
                 is ErrorMessageType -> FlowBus.with<SimpleMessage>(msgAdapter.code.name)
                     .post(coroutineScope, msgAdapter.buildMessage(gson, msg))
@@ -50,6 +56,11 @@ object MessageHandler {
                 is PluginCustomMessageType -> {
                     val pluginMsg = msgAdapter.buildMessage(gson, msg) as Message<PluginCustomEvent>
                     com.zzx.common.plugin.PluginManager.dispatchPluginMessage(pluginMsg.data.pluginId, pluginMsg.data.data)
+                }
+
+                is PluginUninstallMessageType -> {
+                    val uninstallMsg = msgAdapter.buildMessage(gson, msg) as Message<PluginUninstallEvent>
+                    com.zzx.common.plugin.PluginManager.removePlugin(uninstallMsg.data.pluginId, notifyRemote = false)
                 }
 
                 null -> {}
@@ -66,6 +77,7 @@ object MessageHandler {
             CodeEnum.INITUI.value -> InitUiMessageType
             CodeEnum.ITEMCONFIG.value -> ItemConfigMessageType
             CodeEnum.PLUGIN_CUSTOM.value -> PluginCustomMessageType
+            CodeEnum.PLUGIN_UNINSTALL.value -> PluginUninstallMessageType
             else -> null
         }
     }

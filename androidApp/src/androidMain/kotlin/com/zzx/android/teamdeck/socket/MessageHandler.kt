@@ -45,6 +45,14 @@ object MessageHandler {
                     val uninstallMsg = msgAdapter.buildMessage(gson, msg) as Message<PluginUninstallEvent>
                     com.zzx.common.plugin.PluginManager.removePlugin(uninstallMsg.data.pluginId, notifyRemote = false)
                 }
+
+                is SyncPluginsMessageType -> {
+                    val syncMsg = msgAdapter.buildMessage(gson, msg) as Message<com.zzx.common.socket.model.SyncPluginsEvent>
+                    println("Sync: Received authoritative inventory from Desktop: ${syncMsg.data.installedIds}")
+                    com.zzx.common.plugin.PluginManager.reconcilePlugins(syncMsg.data.installedIds)
+                }
+
+                null -> {}
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -54,13 +62,14 @@ object MessageHandler {
 
     private fun buildMessageAdapter(simpleMessage: SimpleMessage): BaseMessageType<*>? {
         return when (simpleMessage.code) {
-            ERROR.ordinal -> ErrorMessageType
-            INIT.ordinal -> InitMessageType
-            INITUI.ordinal -> InitUiMessageType
-            ITEMCONFIG.ordinal -> ItemConfigMessageType
+            CodeEnum.ERROR.value -> ErrorMessageType
+            CodeEnum.INIT.value -> InitMessageType
+            CodeEnum.INITUI.value -> InitUiMessageType
+            CodeEnum.ITEMCONFIG.value -> ItemConfigMessageType
             CodeEnum.PLUGIN_CUSTOM.value -> PluginCustomMessageType
             CodeEnum.PLUGIN_UNINSTALL.value -> PluginUninstallMessageType
+            CodeEnum.SYNC_PLUGINS.value -> SyncPluginsMessageType
             else -> null
         }
     }
-}
+}

@@ -60,25 +60,28 @@ fun main() = application {
         DropBoxPanel(modifier = Modifier.size(300.dp), window = window) {
             rememberCoroutineScope.launch(Dispatchers.IO) {
                 if (it.endsWith(".apk") || it.endsWith(".aar") || it.endsWith(".jar")) {
-                    val localCopy = File(ApplicationInfo.LocalAppData.toString(), File(it).name).absolutePath
-                    FileUtils.copyFileTo(it, ApplicationInfo.LocalAppData.toString())
-
-                    // 加载本地副本以在 Desktop 端展示 UI (避免 Windows 文件锁冲突)
+                    // 使用万能探测加载器，先从原始路径读取 ID 和信息
                     val loader = PluginLoader()
-                    // 使用万能探测加载器，自动从包内读取 plugin.properties
-                    val loadedPlugin = loader.loadPluginAuto(localCopy)
+                    val p = loader.loadPluginAuto(it)
 
-                    loadedPlugin?.let { p ->
-                        // 1. 如果是更新插件，先通知手机端卸载旧版本
-                        com.zzx.common.plugin.PluginManager.removePlugin(p.id, notifyRemote = true)
+                    p?.let { plugin ->
+                        // 1. 如果是更新/安装，先停止本地旧实例，不需要通知手机端（手机端接收新文件时会自动处理替换）
+                        // 注意：此处 trueUninstall 必须为 false，否则会连同 LocalAppData 里的主文件一起删掉
+                        com.zzx.common.plugin.PluginManager.removePlugin(plugin.id, notifyRemote = false, trueUninstall = false)
                         
-                        // 2. 异步同步原始文件到手机
-                        NsdManagerUtils.Instance.sendFile(it)
-
-                        // 3. 在 Desktop 端添加/启动新插件
-                        com.zzx.common.plugin.PluginManager.addPlugin(p)
+                        // 2. 将文件持久化到本地目录
+                        FileUtils.copyFileTo(it, ApplicationInfo.LocalAppData.toString())
+                        val localCopy = File(ApplicationInfo.LocalAppData.toString(), File(it).name).absolutePath
+                        
+                        // 3. 加载本地副本并启动
+                        val finalPlugin = loader.loadPluginAuto(localCopy)
+                        finalPlugin?.let { 
+                            com.zzx.common.plugin.PluginManager.addPlugin(it) 
+                            // 4. 重大修复：在本地加载成功后，立即触发向手机端同步该新文件 (即拖即传)
+                            NsdManagerUtils.Instance.sendFile(localCopy)
+                        }
                     }
-                    println("Desktop plugin handled from: $localCopy")
+                    println("Desktop plugin handled for: $it")
                 }
             }
         }

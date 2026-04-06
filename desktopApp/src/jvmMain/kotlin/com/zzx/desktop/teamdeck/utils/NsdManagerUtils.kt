@@ -25,6 +25,7 @@ import javax.net.ssl.SSLSocketFactory
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.File
 
 class NsdManagerUtils {
     var mMockWebSocket: CMockWebServer? = null
@@ -73,34 +74,21 @@ class NsdManagerUtils {
             val message = Message<InitEvent>(code = CodeEnum.INIT.value, msg = "连接成功", initEvent)
             val json = gson.toJson(message)
             mWebSocket?.send(json)
-            
-            // 【新增】同步现有插件到新设备
-            coroutineScope?.launch(Dispatchers.IO) {
-                // 等待连接完全稳定
-                delay(1200)
-                if (isSyncing) return@launch // 防止重复触发
-                isSyncing = true
-                val pluginDir = ApplicationInfo.LocalAppData.toFile()
-                if (pluginDir.exists() && pluginDir.isDirectory) {
-                    val files = pluginDir.listFiles { _, name ->
-                        name.endsWith(".apk") || name.endsWith(".aar") || name.endsWith(".jar")
-                    }
-                    if (files != null && files.isNotEmpty()) {
-                        println("Syncing ${files.size} plugins to new device...")
-                        files.forEach { file ->
-                            println("Syncing: ${file.name}")
-                            // 并发启动同步任务 (Multiplexing)
-                            coroutineScope?.launch(Dispatchers.IO) {
-                                sendFile(file.absolutePath)
-                            }
-                            // 极短延迟，仅用于给协程调度一点时间
-                            delay(50)
-                        }
-                    }
-                }
-            }
 
-            MdnsUtils.instance.stop()
+            // 【新增】发送同步清单：告知手机端当前 Desktop 上已加载的插件 ID 列表
+            try {
+                val installedIds = com.zzx.common.plugin.PluginManager.plugins.map { it.id }
+                val syncEvent = com.zzx.common.socket.model.SyncPluginsEvent(installedIds)
+                val syncMsg = Message(CodeEnum.SYNC_PLUGINS.value, "同步清单", syncEvent)
+                mWebSocket?.send(gson.toJson(syncMsg))
+                println("Sync: Sent authoritative plugin list to Android: $installedIds")
+            } catch (e: Exception) {
+                println("Error sending SYNC_PLUGINS: ${e.message}")
+            }
+            
+            // 【核心优化】由原来的“全量推送”变为“按需同步”
+            // 后续由 MessageHandler 在接收到 INITUI 后触发具体同步
+            println("Handshake: Connection established. Waiting for Android inventory report...")
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
@@ -197,6 +185,38 @@ class NsdManagerUtils {
 
     suspend fun sendFile(path: String) {
         mWebSocket?.let { mOutFileHandler.sendFile(path, it) }
+    }
+
+    /**
+     * 【智能同步】对比手机端已有的插件 ID 列表，仅向手机发送其缺失的本地插件文件。
+     */
+    fun syncMissingPlugins(androidIds: List<String>) {
+        coroutineScope?.launch(Dispatchers.IO) {
+            println("Sync: Checking for missing plugins on Android (Android has: $androidIds)")
+            
+            // 获取本地所有加载成功的插件及其路径
+            val desktopPlugins = com.zzx.common.plugin.PluginManager.plugins
+            val toSync = desktopPlugins.filter { it.id !in androidIds }
+            
+            if (toSync.isEmpty()) {
+                println("Sync: Android device is already up to date. No transfers needed.")
+                return@launch
+            }
+
+            println("Sync: Found ${toSync.size} plugins to deploy: ${toSync.map { it.id }}")
+            
+            toSync.forEach { plugin ->
+                // 从 PluginManager 注册表中获取该插件对应的物理文件路径
+                val path = com.zzx.common.plugin.PluginManager.getPluginSourcePath(plugin.id)
+                if (path != null && File(path).exists()) {
+                    println("Sync: Pushing missing plugin file: $path")
+                    sendFile(path)
+                    delay(100) // 给予微小间隔防止 Socket 拥塞
+                } else {
+                    println("Sync: Skipping ${plugin.id} - Source file path not registered or missing.")
+                }
+            }
+        }
     }
 
     fun stopMock() {

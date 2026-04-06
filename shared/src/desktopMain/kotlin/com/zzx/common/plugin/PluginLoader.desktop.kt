@@ -50,6 +50,8 @@ actual class PluginLoader actual constructor() {
             val classLoader = java.net.URLClassLoader(urls.toTypedArray(), this.javaClass.classLoader)
             val pluginClass = classLoader.loadClass(mainClass)
             val plugin = pluginClass.getDeclaredConstructor().newInstance() as IPlugin
+            PluginManager.registerSourcePath(plugin.id, pluginPath)
+            PluginManager.registerClassLoader(plugin.id, classLoader)
             plugin
         } catch (e: Exception) {
             e.printStackTrace()
