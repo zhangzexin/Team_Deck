@@ -154,10 +154,7 @@ private fun ItemBuild(number: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp, viewM
             Card(
                 modifier = Modifier
                     .clip(RoundedCornerShape(16.dp))
-                    .size(baseButton, baseButton)
-                    .clickable {
-                        plugin.onTrigger("click")
-                    },
+                    .size(baseButton, baseButton),
                 colors = CardDefaults.cardColors(containerColor = Color.Transparent)
             ) {
                 plugin.AppUI()

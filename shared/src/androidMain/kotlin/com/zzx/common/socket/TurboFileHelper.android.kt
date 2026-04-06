@@ -16,6 +16,7 @@ actual object TurboFileHelper {
         port: Int,
         channel: SeekableByteChannel,
         onReady: () -> Unit,
+        onProgress: (Long) -> Unit,
         onComplete: () -> Unit
     ) {
         // 安卓端通常作为接收方，不直接启动服务口
@@ -24,7 +25,8 @@ actual object TurboFileHelper {
     actual suspend fun receiveTurboFile(
         host: String,
         port: Int,
-        targetPath: String
+        targetPath: String,
+        onProgress: (Long) -> Unit
     ): Boolean {
         return withContext(Dispatchers.IO) {
             println("[TurboClient] Connecting to $host:$port...")
@@ -43,8 +45,16 @@ actual object TurboFileHelper {
                     val source = socket.getInputStream().source().buffer()
                     val sink = targetFile.sink().buffer()
 
-                    println("[TurboClient] Receiving data...")
-                    val totalRead = sink.writeAll(source)
+                    println("[TurboClient] Receiving data in chunks...")
+                    val buffer = ByteArray(64 * 1024)
+                    var totalRead = 0L
+                    var read: Int
+                    
+                    while (source.read(buffer).also { read = it } != -1) {
+                        sink.write(buffer, 0, read)
+                        totalRead += read
+                        onProgress(totalRead)
+                    }
                     sink.flush()
                     
                     println("[TurboClient] File received: $targetPath, Bytes: $totalRead")

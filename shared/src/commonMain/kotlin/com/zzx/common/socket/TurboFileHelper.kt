@@ -13,12 +13,14 @@ expect object TurboFileHelper {
      * @param port 监听端口 (建议 54382)
      * @param channel 文件的读写通道
      * @param onReady 服务端已成功绑定端口并开始监听的回调
+     * @param onProgress 传输进度回调 (已发送字节数)
      * @param onComplete 传输完成 (无论成功失败) 的回调
      */
     fun startTurboServer(
         port: Int,
         channel: SeekableByteChannel,
         onReady: () -> Unit,
+        onProgress: (Long) -> Unit,
         onComplete: () -> Unit
     )
 
@@ -27,11 +29,13 @@ expect object TurboFileHelper {
      * @param host 目标主机 (通常为 127.0.0.1)
      * @param port 目标端口
      * @param targetPath 本地保存路径
+     * @param onProgress 传输进度回调 (已接收字节数)
      * @return 是否传输成功
      */
     suspend fun receiveTurboFile(
         host: String,
         port: Int,
-        targetPath: String
+        targetPath: String,
+        onProgress: (Long) -> Unit
     ): Boolean
 }

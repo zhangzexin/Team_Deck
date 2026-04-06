@@ -21,7 +21,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         plugindir = this.getFileStreamPath("plugin").path
-        InputFileHandler.pluginLoader = PluginLoader(this)
+        
+        // 确保插件目录存在
+        val dir = java.io.File(plugindir!!)
+        if (!dir.exists()) {
+            dir.mkdirs()
+        }
+
+        val loader = PluginLoader(this)
+        InputFileHandler.pluginLoader = loader
+        
+        // 插件持久化：启动时从本地目录加载文件
+        com.zzx.common.plugin.PluginManager.loadPluginsFromDir(plugindir!!, loader)
+
         setContent {
             AppTheme {
                 val viewModel: MainViewModel by viewModels()

@@ -14,6 +14,7 @@ actual object TurboFileHelper {
         port: Int,
         channel: SeekableByteChannel,
         onReady: () -> Unit,
+        onProgress: (Long) -> Unit,
         onComplete: () -> Unit
     ) {
         // 在新线程中启动服务端，不阻塞主协程协程调度 (因 ServerSocket.accept 是阻塞的)
@@ -31,13 +32,21 @@ actual object TurboFileHelper {
                 serverSocket.accept().use { client ->
                     println("[TurboServer] Client connected: ${client.inetAddress}")
                     
-                    val source = Channels.newInputStream(channel).source().buffer()
-                    val sink = client.getOutputStream().sink().buffer()
+                    val inputStream = Channels.newInputStream(channel)
+                    val outputStream = client.getOutputStream()
                     
-                    sink.writeAll(source)
-                    sink.flush()
+                    val buffer = ByteArray(64 * 1024)
+                    var totalWritten = 0L
+                    var read: Int
                     
-                    println("[TurboServer] Stream completed successfully.")
+                    while (inputStream.read(buffer).also { read = it } != -1) {
+                        outputStream.write(buffer, 0, read)
+                        totalWritten += read
+                        onProgress(totalWritten)
+                    }
+                    outputStream.flush()
+                    
+                    println("[TurboServer] Stream completed successfully. Bytes sent: $totalWritten")
                 }
             } catch (e: Exception) {
                 println("[TurboServer] Error: ${e.message}")
@@ -53,7 +62,8 @@ actual object TurboFileHelper {
     actual suspend fun receiveTurboFile(
         host: String,
         port: Int,
-        targetPath: String
+        targetPath: String,
+        onProgress: (Long) -> Unit
     ): Boolean {
         // 桌面端作为发送方，通常不直接调用接收方法
         return false

@@ -44,6 +44,17 @@ fun main() = application {
         MaterialTheme {
             App1()
         }
+        
+        // 插件持久化：启动时从本地目录加载已安装的插件
+        val pluginDir = ApplicationInfo.LocalAppData.toFile()
+        if (!pluginDir.exists()) {
+            pluginDir.mkdirs()
+        }
+        com.zzx.common.plugin.PluginManager.loadPluginsFromDir(
+            pluginDir.absolutePath, 
+            PluginLoader()
+        )
+
         println(Paths.get(System.getProperty("user.home"), "AppData", "Local").toString())
         val rememberCoroutineScope = rememberCoroutineScope()
         DropBoxPanel(modifier = Modifier.size(300.dp), window = window) {

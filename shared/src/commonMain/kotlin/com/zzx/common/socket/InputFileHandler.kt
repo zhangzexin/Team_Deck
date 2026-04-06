@@ -60,6 +60,10 @@ class InputFileHandler : FileMsgInterface {
                             createFileDir(it)
                             pushFileReady(webSocket)
                             state = ByteType.BYTE_FILE_READY
+                            // 立即上报 0% 进度，让 UI 占位符立刻出现
+                            fileInfo?.filename?.let { name ->
+                                PluginManager.updateProgress(name, 0.0f)
+                            }
                         }
                     }
                 }
@@ -132,12 +136,22 @@ class InputFileHandler : FileMsgInterface {
                         val targetPath = plugindir + "/" + fileInfo!!.filename
                         println("[InputFileHandler] Entering Turbo mode! Connecting to localhost:$port")
                         
+                        // 重置已接收字节数，确保 Turbo 模式从头计算
+                        receivedBytes = 0L
+                        
                         // 启动 Raw TCP 接收
-                        val success = TurboFileHelper.receiveTurboFile("127.0.0.1", port, targetPath)
+                        val success = TurboFileHelper.receiveTurboFile("127.0.0.1", port, targetPath) { currentBytes ->
+                            receivedBytes = currentBytes
+                            val progress = if (fileInfo?.fileSize ?: 0L > 0) {
+                                receivedBytes.toFloat() / fileInfo!!.fileSize.toFloat()
+                            } else 0f
+                            PluginManager.updateProgress(fileInfo!!.filename, progress)
+                        }
                         
                         if (success) {
                             println("[InputFileHandler] >>> 🚀 TURBO MODE ENABLED <<<")
                             PluginManager.updateStatus("🚀已连通涡轮极速通道")
+                            // 确保最后一步到达 1.0
                             PluginManager.updateProgress(fileInfo!!.filename, 1.0f)
                             
                             val fileName = fileInfo?.filename

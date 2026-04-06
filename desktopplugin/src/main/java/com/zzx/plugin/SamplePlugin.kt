@@ -55,6 +55,10 @@ class SamplePlugin : IPlugin {
         }
     }
 
+    @Composable
+    override fun SettingsUI() {
+    }
+
     override fun onTrigger(actionId: String, params: Map<String, String>) {
         println("Plugin Triggered: $actionId with $params")
         // 这里可以执行具体业务逻辑，比如调用系统命令

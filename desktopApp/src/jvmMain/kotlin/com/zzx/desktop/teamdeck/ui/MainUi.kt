@@ -20,6 +20,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.zzx.desktop.teamdeck.utils.NsdManagerUtils
+import com.zzx.common.plugin.isSettingsSupported
 
 @Composable
 @Preview
@@ -88,7 +89,11 @@ fun App1() {
                     }
                 },
                 onPluginClick = { plugin ->
-                    activeSettingsPlugin = plugin
+                    if (plugin.isSettingsSupported()) {
+                        activeSettingsPlugin = plugin
+                    } else {
+                        println("Plugin ${plugin.id} does not support Settings UI. Ignoring click.")
+                    }
                 }
             )
         }

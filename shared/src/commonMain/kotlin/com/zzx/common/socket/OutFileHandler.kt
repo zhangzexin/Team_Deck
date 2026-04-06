@@ -43,6 +43,12 @@ class OutFileHandler : FileMsgInterface {
                                 turboStartFrame.flip()
                                 webSocket.send(ByteString.of(*turboStartFrame.array()))
                             },
+                            onProgress = { currentBytes ->
+                                // 桌面端暂不更新本地 UI 进度，仅打印日志
+                                if (currentBytes % (1024 * 1024) == 0L) {
+                                    println("[OutFileHandler] Turbo Sent: $currentBytes bytes")
+                                }
+                            },
                             onComplete = {
                                 if (state != ByteType.BYTE_FILE_FINSH) {
                                     // 如果涡轮结束时状态不是 FINSH，说明可能连接失败了

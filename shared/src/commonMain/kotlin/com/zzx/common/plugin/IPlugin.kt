@@ -28,7 +28,7 @@ interface IPlugin {
      * Desktop 电脑端展示的详尽设置页面 (点击卡片后进入)
      */
     @Composable
-    fun SettingsUI()
+    fun SettingsUI() {}
 
     /**
      * 业务逻辑触发回调
@@ -47,3 +47,8 @@ interface IPlugin {
      */
     var messageSender: ((pluginId: String, data: String) -> Unit)?
 }
+
+/**
+ * 判断插件是否实现了设置页面 (Desktop 专用检查)
+ */
+expect fun IPlugin.isSettingsSupported(): Boolean
