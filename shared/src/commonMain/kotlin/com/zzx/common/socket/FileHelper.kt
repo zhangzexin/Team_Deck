@@ -24,26 +24,22 @@ object FileHelper {
         return dir
     }
 
-    suspend fun pushFileReady(webSocket: WebSocket) {
-        var byteBuffer = ByteBuffer.allocate(4 * 1024)
+    suspend fun pushFileReady(webSocket: WebSocket, transferId: Int) {
+        val byteBuffer = ByteBuffer.allocate(4 * 1024)
         byteBuffer.put(ByteType.BYTE_FILE_READY)
+        byteBuffer.putInt(transferId)
         byteBuffer.put(MARK_READY.toByteArray())
         byteBuffer.flip()
         webSocket.send(byteBuffer.toByteString())
-        byteBuffer.clear()
     }
 
-    fun senFileEnd(webSocket: WebSocket) {
-        if (byteBuffer == null) {
-            byteBuffer = ByteBuffer.allocate(4*1024)
-        }
-        byteBuffer?.apply {
-            put(ByteType.BYTE_FILE_END)
-            put(MARK_END.toByteArray())
-            flip()
-            webSocket.send(this.toByteString())
-        }
-        close()
+    fun senFileEnd(webSocket: WebSocket, transferId: Int) {
+        val byteBuffer = ByteBuffer.allocate(4 * 1024)
+        byteBuffer.put(ByteType.BYTE_FILE_END)
+        byteBuffer.putInt(transferId)
+        byteBuffer.put(MARK_END.toByteArray())
+        byteBuffer.flip()
+        webSocket.send(byteBuffer.toByteString())
     }
 
     fun close() {

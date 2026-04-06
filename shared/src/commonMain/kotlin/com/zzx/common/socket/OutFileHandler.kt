@@ -9,115 +9,94 @@ import java.nio.ByteBuffer
 import java.nio.channels.SeekableByteChannel
 
 /**
- * @描述: 处理上传文件
+ * @描述: 处理上传文件 (支持多路复用并发传输)
  */
 class OutFileHandler : FileMsgInterface {
     override var state = ByteType.BYTE_FILE_INIT
-    var inputByteChannel: SeekableByteChannel? = null
-    var pluginpath: String? = null
+    
+    // 任务状态模�?
+    private class OutTask(
+        val pluginpath: String,
+        val inputByteChannel: SeekableByteChannel,
+        var state: Byte
+    )
+
+    private val tasks = java.util.concurrent.ConcurrentHashMap<Int, OutTask>()
+
     override suspend fun dispacthFile(webSocket: WebSocket, bytes: ByteString) {
         val byteBuffer = ByteBuffer.wrap(bytes.toByteArray())
-        val mark = byteBuffer[0]
-        println("mark:$mark")
+        val mark = byteBuffer.get()
+        
+        // 核心改动：从协议包中提取 4 字节�?TransferID
+        if (byteBuffer.remaining() < 4) return
+        val transferId = byteBuffer.getInt()
+        
+        val task = tasks[transferId] ?: return
+
+        println("Mark: $mark for TransferID: $transferId")
         when (mark) {
             ByteType.BYTE_FILE_READY -> {
-                println("BYTE_FILE_READY")
-                if (state == ByteType.BYTE_FILE_HEAD || state == ByteType.BYTE_FILE_READY) {
-                    inputByteChannel?.apply {
-                        state = ByteType.BYTE_FILE_READY
-
-                        // [核心改进] 优先尝试开启极速涡轮 (Raw TCP) 模式
-                        // 桌面端作为 Server 启动监听，通知安卓端连接 localhost:54382 (adb reverse)
-                        println("[OutFileHandler] Initiating Turbo USB Push...")
-                        val turboPort = 54382
-                        
-                        TurboFileHelper.startTurboServer(
-                            port = turboPort, 
-                            channel = this,
-                            onReady = {
-                                // 关键点：只有当 Server 真正监听好了，才发指令给手机
-                                println("[OutFileHandler] Turbo Server Ready. Sending start command...")
-                                val turboStartFrame = ByteBuffer.allocate(5)
-                                turboStartFrame.put(ByteType.BYTE_FILE_TURBO_START)
-                                turboStartFrame.putInt(turboPort)
-                                turboStartFrame.flip()
-                                webSocket.send(ByteString.of(*turboStartFrame.array()))
-                            },
-                            onProgress = { currentBytes ->
-                                // 桌面端暂不更新本地 UI 进度，仅打印日志
-                                if (currentBytes % (1024 * 1024) == 0L) {
-                                    println("[OutFileHandler] Turbo Sent: $currentBytes bytes")
-                                }
-                            },
-                            onComplete = {
-                                if (state != ByteType.BYTE_FILE_FINSH) {
-                                    // 如果涡轮结束时状态不是 FINSH，说明可能连接失败了
-                                    println("[OutFileHandler] Turbo server closed without success.")
-                                } else {
-                                    state = ByteType.BYTE_FILE_FINSH
-                                }
-                            }
-                        )
+                println("BYTE_FILE_READY for $transferId")
+                if (task.state == ByteType.BYTE_FILE_HEAD || task.state == ByteType.BYTE_FILE_READY) {
+                    task.state = ByteType.BYTE_FILE_READY
+                    
+                    // [核心改进] 发送剩余数�?
+                    // 这里由于是并发环境，我们直接在协程中驱动发�?
+                    SocketFileHelper.pushFileV2(task.inputByteChannel, webSocket, transferId) {
+                        task.state = ByteType.BYTE_FILE_FINSH
                     }
                 }
             }
 
             ByteType.BYTE_FILE_END -> {
-                println("BYTE_FILE_END")
-                byteBuffer.get()
-                val string = String(byteBuffer.array())
-                if (MARK_END == string) {
-                    withContext(Dispatchers.IO) {
-                        inputByteChannel?.close()
-                    }
-                    inputByteChannel = null
-                    state = ByteType.BYTE_FILE_INIT
+                println("BYTE_FILE_END for $transferId")
+                withContext(Dispatchers.IO) {
+                    task.inputByteChannel.close()
                 }
+                tasks.remove(transferId)
+                // 如果所有任务都结束了，将全局状态置�?INIT
+                if (tasks.isEmpty()) state = ByteType.BYTE_FILE_INIT
             }
 
             ByteType.BYTE_FILE_ERROR -> {
-                println("BYTE_FILE_ERROR received.")
-                if (state == ByteType.BYTE_FILE_READY && inputByteChannel != null) {
-                    // [核心改进] 涡轮模式失败后的自动回退机制
-                    // 如果手机端报错（通常是连不上 54382 端口），我们回退到稳健的 WebSocket 模式
-                    println("[OutFileHandler] Turbo mode failed. Falling back to WebSocket...")
-                    SocketFileHelper.pushFileV2(inputByteChannel!!, webSocket) {
-                        state = ByteType.BYTE_FILE_FINSH
-                    }
-                } else {
-                    state = ByteType.BYTE_FILE_ERROR
-                    withContext(Dispatchers.IO) {
-                        inputByteChannel?.close()
-                    }
-                    state = ByteType.BYTE_FILE_INIT
+                println("BYTE_FILE_ERROR received for $transferId.")
+                withContext(Dispatchers.IO) {
+                    task.inputByteChannel.close()
+                }
+                tasks.remove(transferId)
+                if (tasks.isEmpty()) state = ByteType.BYTE_FILE_INIT
+            }
+        }
+    }
+
+    // 发送指定文�?(并发调用安全)
+    suspend fun sendFile(path: String, webSocket: WebSocket) {
+        val transferId = path.hashCode()
+        
+        // 如果该文件已经在传，先取消旧任务
+        tasks[transferId]?.let { oldTask ->
+            withContext(Dispatchers.IO) { oldTask.inputByteChannel.close() }
+            tasks.remove(transferId)
+        }
+
+        println("Initiating multiplexed transfer for: $path (ID: $transferId)")
+        val channel = SocketFileHelper.pushFileInof(path, webSocket, transferId)
+        val newTask = OutTask(path, channel, ByteType.BYTE_FILE_HEAD)
+        tasks[transferId] = newTask
+        state = ByteType.BYTE_FILE_BODY // 表示当前有活跃任�?
+    }
+
+    suspend fun reset() {
+        withContext(Dispatchers.IO) {
+            tasks.forEach { (_, task) ->
+                try {
+                    task.inputByteChannel.close()
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
             }
         }
-    }
-
-
-    //发送指定文件
-    suspend fun sendFile(path: String, webSocket: WebSocket) {
-        if (state != ByteType.BYTE_FILE_INIT) {
-            println("OutFileHandler: Auto-resetting stale state ($state)")
-            reset()
-        }
-        
-        state = ByteType.BYTE_FILE_HEAD
-        pluginpath = path
-        inputByteChannel = SocketFileHelper.pushFileInof(path, webSocket)
-    }
-
-    private suspend fun reset() {
-        withContext(Dispatchers.IO) {
-            try {
-                inputByteChannel?.close()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-        inputByteChannel = null
-        pluginpath = null
+        tasks.clear()
         state = ByteType.BYTE_FILE_INIT
     }
 }

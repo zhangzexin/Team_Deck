@@ -40,6 +40,11 @@ object MessageHandler {
                     val pluginMsg = msgAdapter.buildMessage(gson, msg) as Message<PluginCustomEvent>
                     com.zzx.common.plugin.PluginManager.dispatchPluginMessage(pluginMsg.data.pluginId, pluginMsg.data.data)
                 }
+
+                is PluginUninstallMessageType -> {
+                    val uninstallMsg = msgAdapter.buildMessage(gson, msg) as Message<PluginUninstallEvent>
+                    com.zzx.common.plugin.PluginManager.removePlugin(uninstallMsg.data.pluginId, notifyRemote = false)
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -54,6 +59,7 @@ object MessageHandler {
             INITUI.ordinal -> InitUiMessageType
             ITEMCONFIG.ordinal -> ItemConfigMessageType
             CodeEnum.PLUGIN_CUSTOM.value -> PluginCustomMessageType
+            CodeEnum.PLUGIN_UNINSTALL.value -> PluginUninstallMessageType
             else -> null
         }
     }

@@ -804,6 +804,10 @@ class CMockWebServer : ExternalResource(), Closeable {
 
             // Even if messages are no longer being read we need to wait for the connection close signal.
             connectionClose.await()
+        } catch (e: java.io.EOFException) {
+            // 核心修复：静默处理 EOF (客户端断开)，此处传入异常对象修复编译错误
+            // 具体的静默逻辑由监听器内部根据异常类型判断
+            webSocket.failWebSocket(e, null)
         } catch (e: IOException) {
             webSocket.failWebSocket(e, null)
         } finally {

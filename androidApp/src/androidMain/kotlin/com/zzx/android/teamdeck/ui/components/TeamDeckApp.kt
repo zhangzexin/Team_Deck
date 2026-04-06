@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material3.*
@@ -149,8 +150,7 @@ private fun ItemBuild(number: Int, w: Int, sw: Dp, sh: Dp, baseButton: Dp, viewM
         userScrollEnabled = false
     ) {
         // 1. 渲染加载完成的插件
-        items(loadedPlugins.size) { index ->
-            val plugin = loadedPlugins[index]
+        items(items = loadedPlugins, key = { it.id + it.hashCode() }) { plugin ->
             Card(
                 modifier = Modifier
                     .clip(RoundedCornerShape(16.dp))

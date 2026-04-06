@@ -42,3 +42,5 @@ dependencyResolutionManagement {
 include(":desktopplugin")
 include(":imageplugin")
 include(":systemmonitorplugin")
+include(":androidstudioplugin")
+include(":scriptexecutorplugin")

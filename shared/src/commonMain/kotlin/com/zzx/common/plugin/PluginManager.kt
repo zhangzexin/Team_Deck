@@ -3,6 +3,10 @@ package com.zzx.common.plugin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
+import com.google.gson.Gson
+import com.zzx.common.socket.model.Message
+import com.zzx.common.socket.model.PluginUninstallEvent
+import com.zzx.common.socket.type.CodeEnum
 
 /**
  * 共享插件管理器
@@ -20,6 +24,47 @@ object PluginManager {
 
     // 全局消息发送钩子 (由宿主注入)
     var globalMessageSender: ((String) -> Unit)? = null
+    
+    private val gson = Gson()
+
+    // [核心改进] 全局任务注册表：确保每个插件 ID 在整个应用生命周期内只有一个活跃任务
+    private val activeJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
+
+    // [核心改进] 单调实例 ID 追踪：跨 ClassLoader 识别“僵尸”消息的关键
+    private val latestInstanceIds = mutableMapOf<String, Long>()
+
+    /**
+     * 校验传入的消息是否来自该插件的最新实例
+     * @return 0: 丢弃(旧), 1: 接受(同代), 2: 接受并触发重置(全新高代)
+     */
+    fun checkMessageVersion(pluginId: String, incomingId: Long): Int {
+        val currentMax = latestInstanceIds[pluginId] ?: 0L
+        return when {
+            incomingId > currentMax -> {
+                latestInstanceIds[pluginId] = incomingId
+                2 // 全新高代
+            }
+            incomingId == currentMax && incomingId != 0L -> 1 // 同代
+            else -> 0 // 丢弃(旧或无效)
+        }
+    }
+
+    /**
+     * [二进制兼容性支持] 旧版插件 (如 SystemMonitorPlugin) 还在调用此方法。
+     * @return true 如果 checkMessageVersion 返回 1 或 2 (即接受消息)
+     */
+    fun shouldProcessMessage(pluginId: String, incomingId: Long): Boolean {
+        return checkMessageVersion(pluginId, incomingId) >= 1
+    }
+
+    fun registerJob(pluginId: String, job: kotlinx.coroutines.Job) {
+        activeJobs[pluginId]?.cancel()
+        activeJobs[pluginId] = job
+    }
+
+    fun cancelJob(pluginId: String) {
+        activeJobs.remove(pluginId)?.cancel()
+    }
 
     val plugins: List<IPlugin> get() = _plugins
 
@@ -47,9 +92,43 @@ object PluginManager {
         _plugins.find { it.id == pluginId }?.onReceive(data)
     }
 
+    /**
+     * 彻底移除一个插件 (包括本地销毁和可选的通知远程卸载)
+     */
+    fun removePlugin(pluginId: String, notifyRemote: Boolean = false) {
+        val existing = _plugins.filter { it.id == pluginId }
+        if (existing.isNotEmpty()) {
+            if (notifyRemote) {
+                try {
+                    val uninstallEvent = PluginUninstallEvent(pluginId)
+                    val message = Message(CodeEnum.PLUGIN_UNINSTALL.value, "卸载插件", uninstallEvent)
+                    globalMessageSender?.invoke(gson.toJson(message))
+                } catch (e: Exception) {
+                    println("Error notifying remote uninstall: ${e.message}")
+                }
+            }
+
+            existing.forEach { oldPlugin ->
+                try {
+                    println("Plugin Lifecycle: Destroying instance of ${oldPlugin.id}")
+                    oldPlugin.onDestroy()
+                } catch (e: Throwable) {
+                    println("Warning: Error destroying plugin ${oldPlugin.id}: ${e.message}")
+                }
+            }
+            _plugins.removeAll { it.id == pluginId }
+            _pluginFlow.value = _plugins.toList()
+            
+            // 建议回收资源
+            System.gc()
+            System.runFinalization()
+        }
+    }
+
     fun addPlugin(plugin: IPlugin) {
+        // 如果插件已存在，先执行标准的本地移除流程 (不重复触发远程通知)
         if (_plugins.any { it.id == plugin.id }) {
-            _plugins.removeAll { it.id == plugin.id }
+            removePlugin(plugin.id, notifyRemote = false)
         }
         
         // 注入发送能力给插件 (增加对旧插件的兼容性处理)

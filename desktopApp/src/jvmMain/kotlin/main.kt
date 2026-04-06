@@ -62,9 +62,6 @@ fun main() = application {
                 if (it.endsWith(".apk") || it.endsWith(".aar") || it.endsWith(".jar")) {
                     val localCopy = File(ApplicationInfo.LocalAppData.toString(), File(it).name).absolutePath
                     FileUtils.copyFileTo(it, ApplicationInfo.LocalAppData.toString())
-                    
-                    // 异步发送原始文件
-                    NsdManagerUtils.Instance.sendFile(it)
 
                     // 加载本地副本以在 Desktop 端展示 UI (避免 Windows 文件锁冲突)
                     val loader = PluginLoader()
@@ -72,6 +69,13 @@ fun main() = application {
                     val loadedPlugin = loader.loadPluginAuto(localCopy)
 
                     loadedPlugin?.let { p ->
+                        // 1. 如果是更新插件，先通知手机端卸载旧版本
+                        com.zzx.common.plugin.PluginManager.removePlugin(p.id, notifyRemote = true)
+                        
+                        // 2. 异步同步原始文件到手机
+                        NsdManagerUtils.Instance.sendFile(it)
+
+                        // 3. 在 Desktop 端添加/启动新插件
                         com.zzx.common.plugin.PluginManager.addPlugin(p)
                     }
                     println("Desktop plugin handled from: $localCopy")

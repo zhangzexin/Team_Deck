@@ -46,6 +46,12 @@ interface IPlugin {
      * 持有的消息发送接口，由宿主在加载时注入
      */
     var messageSender: ((pluginId: String, data: String) -> Unit)?
+
+    /**
+     * 插件卸载/销毁时的生命周期回调
+     * 在插件被替换或移除前调用，用于停止后台任务、释放资源等。
+     */
+    fun onDestroy() {}
 }
 
 /**

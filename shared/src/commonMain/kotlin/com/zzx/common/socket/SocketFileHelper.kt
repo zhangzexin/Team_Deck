@@ -17,7 +17,7 @@ import java.nio.file.StandardOpenOption
 object SocketFileHelper {
     var count = 0
 
-    suspend fun pushFile(path: String, webSocket: WebSocket, changeEnd: () -> Unit) {
+    suspend fun pushFile(path: String, webSocket: WebSocket, transferId: Int, changeEnd: () -> Unit) {
         withContext(Dispatchers.IO) {
             val file = File(path)
             val newByteChannel = Files.newByteChannel(file.toPath(), StandardOpenOption.READ)
@@ -29,9 +29,10 @@ object SocketFileHelper {
                 var chunkCount = 0
                 while (newByteChannel.read(body) > 0) {
                     body.flip()
-                    // 构造：[BODY_TYPE][DATA...]
-                    val frame = ByteBuffer.allocate(body.remaining() + 1)
+                    // 构造：[BODY_TYPE][ID(4)][DATA...]
+                    val frame = ByteBuffer.allocate(body.remaining() + 5)
                     frame.put(ByteType.BYTE_FILE_BODY)
+                    frame.putInt(transferId)
                     frame.put(body)
                     frame.flip()
                     
@@ -57,8 +58,9 @@ object SocketFileHelper {
                 
                 // 确保数据刷新与完成帧发送
                 delay(200)
-                val finishFrame = ByteBuffer.allocate(MARK_FINSH.toByteArray().size + 1)
+                val finishFrame = ByteBuffer.allocate(MARK_FINSH.toByteArray().size + 5)
                 finishFrame.put(ByteType.BYTE_FILE_FINSH)
+                finishFrame.putInt(transferId)
                 finishFrame.put(MARK_FINSH.toByteArray())
                 finishFrame.flip()
                 webSocket.send(finishFrame.toByteString())
@@ -72,7 +74,7 @@ object SocketFileHelper {
         }
     }
 
-    suspend fun pushFileV2(newByteChannel: SeekableByteChannel, webSocket: WebSocket, changeEnd: () -> Unit) {
+    suspend fun pushFileV2(newByteChannel: SeekableByteChannel, webSocket: WebSocket, transferId: Int, changeEnd: () -> Unit) {
         withContext(Dispatchers.IO) {
             val bufferSize = 64 * 1024
             val body = ByteBuffer.allocate(bufferSize)
@@ -81,9 +83,10 @@ object SocketFileHelper {
             try {
                 while (newByteChannel.read(body) > 0) {
                     body.flip()
-                    // 构造数据帧：[MARK_BODY][DATA...]
-                    val frame = ByteBuffer.allocate(body.remaining() + 1)
+                    // 构造数据帧：[MARK_BODY][ID(4)][DATA...]
+                    val frame = ByteBuffer.allocate(body.remaining() + 5)
                     frame.put(ByteType.BYTE_FILE_BODY)
+                    frame.putInt(transferId)
                     frame.put(body)
                     frame.flip()
                     
@@ -92,14 +95,22 @@ object SocketFileHelper {
                         break
                     }
                     body.clear()
-                    yield() // 让出 CPU，处理心跳与控制帧
+                    
+                    // 流量节流阀 (Flow Control): 防止高并发传输淹没心跳 Ping/Pong
+                    while (webSocket.queueSize() > 2 * 1024 * 1024) {
+                        delay(100)
+                        yield()
+                    }
+                    
+                    yield()
                 }
                 
                 // 发送结束帧
                 // 增加少量延迟，确保所有数据包在连接状态改变前已送达接收端缓冲区
                 delay(200)
-                val finishFrame = ByteBuffer.allocate(MARK_FINSH.toByteArray().size + 1)
+                val finishFrame = ByteBuffer.allocate(MARK_FINSH.toByteArray().size + 5)
                 finishFrame.put(ByteType.BYTE_FILE_FINSH)
+                finishFrame.putInt(transferId)
                 finishFrame.put(MARK_FINSH.toByteArray())
                 finishFrame.flip()
                 if (webSocket.send(finishFrame.toByteString())) {
@@ -114,11 +125,12 @@ object SocketFileHelper {
         }
     }
 
-    suspend fun pushFileInof(filePath: String, webSocket: WebSocket): SeekableByteChannel {
+    suspend fun pushFileInof(filePath: String, webSocket: WebSocket, transferId: Int): SeekableByteChannel {
         val file = File(filePath)
-        var byteBuffer = ByteBuffer.allocate(4 * 1024)
+        var byteBuffer = ByteBuffer.allocate(8 * 1024)
         byteBuffer.put(ByteType.BYTE_FILE_HEAD)
-        val json = FileInfo(file.name, file.length(), "").toJson()
+        byteBuffer.putInt(transferId)
+        val json = FileInfo(file.name, file.length(), "", transferId).toJson()
         byteBuffer.put(json.toByteArray())
         byteBuffer.flip()
         webSocket.send(byteBuffer.toByteString())

@@ -9,9 +9,11 @@ import com.zzx.desktop.teamdeck.socket.CMockWebServer
 import com.zzx.desktop.teamdeck.socket.MdnsUtils
 import com.zzx.desktop.teamdeck.socket.MessageHandler
 import com.zzx.desktop.teamdeck.socket.ssl.RxUtils
+import com.zzx.desktop.teamdeck.ApplicationInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -29,6 +31,7 @@ class NsdManagerUtils {
     var coroutineScope: CoroutineScope? = null
     val mOutFileHandler = OutFileHandler()
     var mWebSocket: WebSocket? = null
+    private var isSyncing = false
 
     // 连接状态与类型
     private val _isConnected = MutableStateFlow(false)
@@ -47,6 +50,7 @@ class NsdManagerUtils {
         val gson = Gson()
         override fun onOpen(webSocket: WebSocket, response: Response) {
             mWebSocket = webSocket
+            isSyncing = false // 为新会话重置同步状态
             
             // 判定连接类型 (ADB Reverse 通常会显示为 127.0.0.1)
             val host = response.request.url.host
@@ -69,6 +73,33 @@ class NsdManagerUtils {
             val message = Message<InitEvent>(code = CodeEnum.INIT.value, msg = "连接成功", initEvent)
             val json = gson.toJson(message)
             mWebSocket?.send(json)
+            
+            // 【新增】同步现有插件到新设备
+            coroutineScope?.launch(Dispatchers.IO) {
+                // 等待连接完全稳定
+                delay(1200)
+                if (isSyncing) return@launch // 防止重复触发
+                isSyncing = true
+                val pluginDir = ApplicationInfo.LocalAppData.toFile()
+                if (pluginDir.exists() && pluginDir.isDirectory) {
+                    val files = pluginDir.listFiles { _, name ->
+                        name.endsWith(".apk") || name.endsWith(".aar") || name.endsWith(".jar")
+                    }
+                    if (files != null && files.isNotEmpty()) {
+                        println("Syncing ${files.size} plugins to new device...")
+                        files.forEach { file ->
+                            println("Syncing: ${file.name}")
+                            // 并发启动同步任务 (Multiplexing)
+                            coroutineScope?.launch(Dispatchers.IO) {
+                                sendFile(file.absolutePath)
+                            }
+                            // 极短延迟，仅用于给协程调度一点时间
+                            delay(50)
+                        }
+                    }
+                }
+            }
+
             MdnsUtils.instance.stop()
         }
 
@@ -96,14 +127,25 @@ class NsdManagerUtils {
             println("WebSocket closed: $code $reason")
             _isConnected.value = false
             _connectionType.value = "未连接"
+            coroutineScope?.launch(Dispatchers.IO) {
+                mOutFileHandler.reset()
+            }
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             // 当 websocket 连接出现异常时，打印异常信息
-            println("WebSocket onFailure: ${t.toString()} ")
-            t.printStackTrace()
+            if (t is java.io.EOFException) {
+                // 核心优化：针对 EOF (静默断开) 不打印大段堆栈，仅显示状态
+                println("WebSocket status: Client Disconnected (EOF)")
+            } else {
+                println("WebSocket onFailure: ${t.toString()} ")
+                t.printStackTrace()
+            }
             _isConnected.value = false
             _connectionType.value = "未连接"
+            coroutineScope?.launch(Dispatchers.IO) {
+                mOutFileHandler.reset()
+            }
         }
     }
 
