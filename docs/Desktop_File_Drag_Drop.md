@@ -1,4 +1,15 @@
-# 实现desktop端的拖住文件
+# Desktop File Drag and Drop | 实现 Desktop 端的拖拽文件
+
+English | [中文](#中文)
+
+This document discusses two ways to implement file drag-and-drop in Compose for Desktop.
+
+---
+
+<a name="中文"></a>
+
+# 实现 Desktop 端的拖拽文件 (或 “拖住” 文件)
+
 ## 文件拖拽两种方式
 ### 第一种方式参考：\
 目前国内能查到的应该是《[使用ComposeDesktop开发一款桌面端多功能APK工具](https://juejin.cn/post/7122645579439538183)》\

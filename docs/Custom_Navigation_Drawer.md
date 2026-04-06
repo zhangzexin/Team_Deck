@@ -1,3 +1,13 @@
+# Custom Navigation Drawer with Controllable Width | 实现可控宽带的侧边抽屉
+
+English | [中文](#中文)
+
+This document explains how to implement a custom navigation drawer in Material 3 that allows controlling the drawer's width.
+
+---
+
+<a name="中文"></a>
+
 # 实现可控宽带的侧边抽屉
 ### 实现效果
 正常:\

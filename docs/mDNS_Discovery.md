@@ -1,4 +1,14 @@
-# 使用android自带的mDNS
+# mDNS Discovery on Android | 使用 Android 自带的 mDNS
+
+English | [中文](#中文)
+
+This document describes how to use Android's Network Service Discovery (NSD) to find devices on the same local network.
+
+---
+
+<a name="中文"></a>
+
+# 使用 Android 自带的 mDNS
 ## 目标
 用于查找同一个局域网环境下的设备
 ## 官方说明([链接]("https://developer.android.com/training/connect-devices-wirelessly/nsd?hl=zh-cn"))：
