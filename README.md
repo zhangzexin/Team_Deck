@@ -4,7 +4,7 @@ English | [中文](#中文)
 
 Team Deck is a cross-platform, professional-grade interaction tool built with **Compose Multiplatform**. It allows you to use your Android device as a powerful "Stream Deck-like" remote controller for your Desktop, enabling seamless scene switching, performance monitoring, and script execution.
 
-![Team Deck Banner](doc/int.png)
+![Team Deck Banner](doc/init.png)
 
 ## 🚀 Key Features
 
