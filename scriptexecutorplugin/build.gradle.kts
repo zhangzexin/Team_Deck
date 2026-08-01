@@ -103,6 +103,9 @@ android {
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
     dependsOn(packageDesktopJar)
 }
+tasks.matching { it.name.startsWith("lintVital") }.configureEach {
+    dependsOn(packageDesktopJar)
+}
 
 dependencies {
     // 基础依赖 (compileOnly)
