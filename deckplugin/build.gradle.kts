@@ -111,6 +111,9 @@ android {
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
     dependsOn(packageDesktopJar)
 }
+tasks.matching { it.name.startsWith("lintVital") }.configureEach {
+    dependsOn(packageDesktopJar)
+}
 
 dependencies {
     // 强制瘦身策略：所有宿主已有的库全部声明为 compileOnly，防止重复打包
