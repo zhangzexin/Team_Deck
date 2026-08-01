@@ -56,7 +56,7 @@ kotlin {
         val desktopMain by getting {
             dependencies {
                 api(compose.desktop.common)
-                api(compose.desktop.windows_x64)
+                api(compose.desktop.currentOs)
                 api(libs.okhttp3.mockwebserver)
                 api(libs.jmdns)
             }

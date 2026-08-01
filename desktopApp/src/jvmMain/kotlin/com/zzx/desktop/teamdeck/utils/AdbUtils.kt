@@ -71,6 +71,7 @@ object AdbUtils {
             listOf(
                 System.getenv("ANDROID_HOME")?.let { "$it/platform-tools/adb" },
                 File(System.getProperty("user.home"), "Library/Android/sdk/platform-tools/adb").absolutePath,
+                "/opt/homebrew/bin/adb",
                 "/usr/local/bin/adb",
                 "/usr/bin/adb"
             )
@@ -163,7 +164,7 @@ object AdbUtils {
     private fun getConnectedDevices(adb: String): List<String> {
         val devices = mutableListOf<String>()
         try {
-            val process = Runtime.getRuntime().exec("$adb devices")
+            val process = Runtime.getRuntime().exec(arrayOf(adb, "devices"))
             process.inputStream.bufferedReader().useLines { lines ->
                 lines.forEach { line ->
                     if (line.endsWith("device")) {
@@ -177,8 +178,10 @@ object AdbUtils {
 
     private fun runAdbCommand(adb: String, command: String) {
         try {
-            val fullCommand = "\"$adb\" $command"
-            val process = Runtime.getRuntime().exec(fullCommand)
+            // exec(String) 按空白分词且不解析引号，macOS/Linux 上 argv[0] 会带上字面引号导致 ENOENT，
+            // 必须用数组形式传参（各参数本身不含空格，按空白切分即可）
+            val args = arrayOf(adb) + command.split(" ").filter { it.isNotBlank() }
+            val process = Runtime.getRuntime().exec(args)
             val exitCode = process.waitFor()
             if (exitCode != 0) {
                 val error = process.errorStream.bufferedReader().readText()

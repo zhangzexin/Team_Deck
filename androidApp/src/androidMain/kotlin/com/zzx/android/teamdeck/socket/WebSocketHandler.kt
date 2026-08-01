@@ -26,6 +26,11 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
+    // 二进制文件帧必须按到达顺序处理：多线程 IO 池并发 launch 会让 BODY 帧竞态乱序写入，
+    // 多文件并发传输时表现为"大小一致但内容损坏"（dex 解压 Zlib error）
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val fileFrameDispatcher = Dispatchers.IO.limitedParallelism(1)
+
     private val _connectionSuccessEvent = MutableSharedFlow<Boolean>(extraBufferCapacity = 1)
     val connectionSuccessEvent = _connectionSuccessEvent.asSharedFlow()
     
@@ -67,7 +72,7 @@ class WebSocketHandler constructor(var coroutineScope: CoroutineScope? = null) {
         /** Invoked when a binary (type `0x2`) message has been received. */
         override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
             Log.d(TAG, "onMessage(type `0x2`): ")
-            coroutineScope?.launch(Dispatchers.IO) {
+            coroutineScope?.launch(fileFrameDispatcher) {
                 mInputFileHandler.dispacthFile(webSocket,bytes)
             }
         }

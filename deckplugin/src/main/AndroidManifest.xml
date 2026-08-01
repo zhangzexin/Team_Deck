@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- 插件模块通常不需要启动 Activity，仅作为代码和资源的载体 -->
+    </application>
+</manifest>

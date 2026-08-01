@@ -155,15 +155,17 @@ class NsdManagerUtils {
 
         //    mMockWebSocket?.enqueue(MockResponse().withWebSocketUpgrade(webSocketListener))
 
-        // 创建一个 MockResponse 对象，用于响应 websocket 握手请求
-        val mockResponse = MockResponse()
-            .setResponseCode(101) // 设置响应码为 101 ，表示切换协议
-            .addHeader("Upgrade", "websocket") // 设置 Upgrade 头部为 websocket ，表示切换到 websocket 协议
-            .addHeader("Connection", "Upgrade") // 设置 Connection 头部为 Upgrade ，表示保持连接
-            .withWebSocketUpgrade(webSocketListener) // 设置 websocket 升级监听器
-
-        // 将响应添加到队列中
-        mMockWebSocket?.enqueue(mockResponse)
+        // 使用自定义 Dispatcher 替代单次 enqueue：每个握手请求都返回新的 101 升级响应，
+        // 手机端断开后重连不会再因响应队列耗尽而挂起
+        mMockWebSocket?.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+            override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest): MockResponse {
+                return MockResponse()
+                    .setResponseCode(101) // 设置响应码为 101 ，表示切换协议
+                    .addHeader("Upgrade", "websocket")
+                    .addHeader("Connection", "Upgrade")
+                    .withWebSocketUpgrade(webSocketListener) // 设置 websocket 升级监听器
+            }
+        }
         val lanAddress = NetUtils.getLocalHostAddress()
         // 绑定到 0.0.0.0 以支持 localhost (USB) 和局域网 (WiFi)
         mMockWebSocket?.start(java.net.InetAddress.getByName("0.0.0.0"), 0)
