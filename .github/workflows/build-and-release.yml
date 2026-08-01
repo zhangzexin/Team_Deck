@@ -31,13 +31,13 @@ jobs:
           persist-credentials: false
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Test Android code
         run: >-
@@ -141,7 +141,7 @@ jobs:
           cp deckplugin/build/outputs/apk/debug/deckplugin-debug.apk build-artifacts/
 
       - name: Upload Android artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-${{ github.sha }}
           path: build-artifacts/*
@@ -161,13 +161,13 @@ jobs:
           persist-credentials: false
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Test desktop code
         run: ./gradlew --stacktrace :shared:desktopTest :desktopApp:jvmTest
@@ -182,7 +182,7 @@ jobs:
           cp desktopApp/build/compose/binaries/main/dmg/*.dmg build-artifacts/
 
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-debug-${{ github.sha }}
           path: build-artifacts/*
@@ -203,7 +203,7 @@ jobs:
 
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           path: release-artifacts
           merge-multiple: true
